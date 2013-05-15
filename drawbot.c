@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <getopt.h>
+#include <string.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <asm/ioctl.h>
@@ -29,6 +32,11 @@
 #define AXIS_FORWARD(data, axis) ((data) |= (axis))
 #define AXIS_REVERSE(data, axis) ((data) &= ~(axis))
 
+static struct option long_options[] = {
+  {"device", required_argument, NULL, 'd'},
+  {0},
+};
+
 int read_data(int);
 int write_data(int, unsigned char);
 int status_pins(int);
@@ -37,8 +45,30 @@ int strobe_blink(int);
 int main(int argc, char *argv[]) {
   int n, fd, mode;
 
-  if((fd = open(DEVICE, O_RDWR)) < 0) {
-    fprintf(stderr, "Failed to open %s\n", DEVICE);
+  char *device = NULL;
+
+  while(1) {
+    int option_index = 0;
+    int c = getopt_long(argc, argv, "", long_options, &option_index);
+    if(c == -1) {
+      break;
+    }
+
+    switch(option_index) {
+    case 0: {
+      if(device) {
+	free(device);
+      }
+      device = malloc(strlen(optarg));
+      strcpy(device, optarg);
+    } break;
+    default:
+      break;
+    }
+  }
+
+  if((fd = open(device, O_RDWR)) < 0) {
+    fprintf(stderr, "Failed to open %s\n", device);
     return 10;
   }
   if(ioctl(fd, PPCLAIM)) {
