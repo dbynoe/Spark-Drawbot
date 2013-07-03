@@ -2,7 +2,7 @@ CC=gcc
 CCFLAGS=-c -std=c99 -lm
 LDFLAGS=
 
-SOURCES=drawbot.c
+SOURCES=$(wildcard *.c)
 OBJECTS=$(SOURCES:.c=.o)
 TARGET=drawbotd
 
