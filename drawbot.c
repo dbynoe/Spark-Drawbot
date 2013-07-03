@@ -14,7 +14,16 @@
 
 #include "gecko.h"
 
+#define DEBOUNCE_COUNT 16
+
 volatile int shutdown = 0;
+
+struct axis_state {
+  int x, y, z, a;
+  int xy, xz, xa;
+  int yz, ya;
+  int za;
+};
 
 static struct option long_options[] = {
   {"device", required_argument, NULL, 'd'},
@@ -27,8 +36,8 @@ int status_pins(int);
 void strobe_blink(int);
 
 void sig_shutdown(int);
-void zero(const int);
-void step(int fd, unsigned char, unsigned char);
+int zero(const int, struct axis_state *p);
+void step(int fd, unsigned char, unsigned char, int);
 
 int main(int argc, char *argv[]) {
   int fd;
@@ -57,7 +66,7 @@ int main(int argc, char *argv[]) {
   }
 
   if(device == NULL) {
-    printf("A parallel must be specified with the --device option\n");
+    printf("A parallel port must be specified with the --device option\n");
     return -1;
   }
 
@@ -71,29 +80,20 @@ int main(int argc, char *argv[]) {
     return 10;
   }
 
-  zero(fd);
-
-  /*
-  const int limmask = X_AXIS_LIMIT | Y_AXIS_LIMIT | Z_AXIS_LIMIT | A_AXIS_LIMIT;
-  int prev = 0;
-  while(!shutdown) {
-    int curr = status_pins(fd) & limmask;
-    if(curr == prev) {
-      continue;
-    }
-    prev = curr;
-
-    if(curr == 0) {
-      continue;
-    }
-
-    if(curr & X_AXIS_LIMIT) printf("X");
-    if(curr & Y_AXIS_LIMIT) printf("Y");
-    if(curr & Z_AXIS_LIMIT) printf("Z");
-    if(curr & A_AXIS_LIMIT) printf("A");
-    printf("\n");
+  struct axis_state state = {0};
+  if(zero(fd, &state)) {
+    printf("Fault!");
   }
-  */
+  else {
+    printf("XY: %d\n", state.xy);
+    printf("XZ: %d\n", state.xz);
+    printf("XA: %d\n", state.xa);
+
+    printf("YZ: %d\n", state.yz);
+    printf("YA: %d\n", state.ya);
+
+    printf("ZA: %d\n", state.za);
+  }
 
   ioctl(fd, PPRELEASE);
   close(fd);
@@ -101,90 +101,171 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-void zero(const int fd) {
-  int delay = 300;
-  int cmd, dir, status = status_pins(fd);
+int zero(const int fd, struct axis_state *state) {
+  int delay = 500;
+  int cmd, dir, status, limit, tsteps;
 
-  if(status & Z_AXIS_LIMIT) {
-    printf("Z is homed\n");
-  } else if(status & X_AXIS_LIMIT) {
-    printf("X is homed\n");
+  memset(state, 0, sizeof(state));
 
-    int steps = 0;
-    cmd = X_AXIS_STEP | Z_AXIS_STEP;
+  cmd = X_AXIS_STEP | Z_AXIS_STEP;
+  dir = AXIS(Z_AXIS_DIR, X_AXIS_DIR);
 
-    dir = 0;
-    dir = AXIS_FORWARD(dir, X_AXIS_DIR);
-    dir = AXIS_REVERSE(dir, Z_AXIS_DIR);
-    while(1) {
-      status = status_pins(fd);
-      if(status & FAULT) {
-	printf("Fault!\n");
-	return;
-      }
-      if(status & Z_AXIS_LIMIT) {
+  limit = 0;
+  while(1) {
+    status = status_pins(fd);
+    if(status & FAULT) {
+      return -1;
+    }
+    if(status & X_AXIS_LIMIT) {
+      if(limit < DEBOUNCE_COUNT) {
+	++limit;
+      } else {
 	break;
       }
-
-      step(fd, dir, cmd);
-      usleep(delay);
-
-      ++steps;
     }
+    step(fd, dir, cmd, delay);
+  }
+  printf("X homed\n");
 
-    printf("Limit Tripped\n");
+  tension(fd, AXIS(0, Z_AXIS_DIR), Z_AXIS_STEP, X_AXIS_LIMIT, 1000);
+  printf("XZ tensioned\n");
 
-    cmd = X_AXIS_STEP;
-    dir = 0;
-    dir = AXIS_REVERSE(dir, X_AXIS_DIR);
-
-    while(status & Z_AXIS_LIMIT) {
-      status = status_pins(fd);
-      if(status & FAULT) {
-	return;
-      }
-
-      step(fd, dir, cmd);
-      usleep(delay);
-
-      --steps;
+  limit = 0;
+  while(1) {
+    status = status_pins(fd);
+    if(status & X_AXIS_LIMIT) {
+      break;
     }
-
-    printf("%d\n", steps);
-
-    return;
-  } else if(status & Y_AXIS_LIMIT) {
-    printf("Y is homed\n");
-  } else if(status & A_AXIS_LIMIT) {
-    printf("A is homed\n");
-  } else {
-    delay = 500;
-    cmd = X_AXIS_STEP | Z_AXIS_STEP;
-    dir = AXIS_REVERSE(dir, X_AXIS_DIR);
-    dir = AXIS_FORWARD(dir, Z_AXIS_DIR);
-
-    while(1) {
-      status = status_pins(fd);
-
-      if(status & FAULT) {
-	printf("Fault!\n");
-	break;
-      }
-      if(status & X_AXIS_LIMIT) {
-	zero(fd);
-	break;
-      }
-      step(fd, dir, cmd);
-      usleep(delay);
-    }
+    step(fd, dir, cmd, delay);
   }
 
-  return;
+  cmd = X_AXIS_STEP | Z_AXIS_STEP;
+  dir = AXIS(X_AXIS_DIR, Z_AXIS_DIR);
+  while(1) {
+    status = status_pins(fd);
+    if(status & FAULT) {
+      return -1;
+    }
+    if(status & Z_AXIS_LIMIT) {
+      break;
+    }
+
+    step(fd, dir, cmd, delay);
+    ++state->x;
+  }
+  state->xz = state->x;
+  printf("Z homed\n");
+
+  limit = 0;
+  cmd = Z_AXIS_STEP | Y_AXIS_STEP;
+  dir = AXIS(Z_AXIS_DIR, Y_AXIS_DIR);
+  while(1) {
+    status = status_pins(fd);
+    if(status & FAULT) {
+      return -1;
+    }
+    if(status & Y_AXIS_LIMIT) {
+      if(limit < DEBOUNCE_COUNT) {
+	++limit;
+      } else {
+	break;
+      }
+    }
+
+    step(fd, dir, cmd, delay);
+    ++state->z;
+  }
+  printf("Y homed\n");
+
+  tsteps = tension(fd, AXIS(0, Z_AXIS_DIR), Z_AXIS_STEP, Y_AXIS_LIMIT, 1000);
+  if(tsteps < 0) {
+    return tsteps;
+  }
+  state->z -= tsteps;
+  state->yz = state->z;
+  printf("YZ tensioned\n");
+
+  cmd = X_AXIS_STEP;
+  dir = AXIS(0, X_AXIS_DIR);
+  while(state->x > state->z) {
+    status = status_pins(fd);
+    if(status & FAULT) {
+      return -1;
+    }
+    step(fd, dir, cmd, delay);
+    --state->x;
+  }
+  state->xy = state->x;
+  printf("XY tensioned\n");
+
+  limit = 0;
+  cmd = Y_AXIS_STEP | A_AXIS_STEP;
+  dir = AXIS(Y_AXIS_DIR, A_AXIS_DIR);
+  while(1) {
+    status = status_pins(fd);
+    if(status & FAULT) {
+      return -1;
+    }
+    if(status & A_AXIS_LIMIT) {
+      if(limit < DEBOUNCE_COUNT) {
+	++limit;
+	usleep(delay);
+	continue;
+      }
+      break;
+    }
+    if(state->y > state->xz) {
+      cmd |= X_AXIS_STEP;
+      cmd |= Z_AXIS_STEP;
+      dir = AXIS_FORWARD(dir, X_AXIS_DIR);
+      dir = AXIS_FORWARD(dir, Z_AXIS_DIR);
+      ++state->x;
+      ++state->z;
+    }
+    limit = 0;
+    ++state->y;
+    step(fd, dir, cmd, delay);
+  }
+
+  tsteps = tension(fd, AXIS(0, Y_AXIS_DIR), Y_AXIS_STEP, A_AXIS_LIMIT, 1000);
+  if(tsteps < 0) {
+    return tsteps;
+  }
+  state->y -= tsteps;
+  state->ya = state->y;
+
+  return 0;
 }
 
-void step(int fd, unsigned char dir, unsigned char cmd) {
+int tension(int fd, int dir, int cmd, int lim, int delay) {
+  int status, limit = 0, steps = 0;
+  while(1) {
+    status = status_pins(fd);
+    if(status & FAULT) {
+      return -1;
+    }
+    if(!(status & lim)) {
+      if(limit < DEBOUNCE_COUNT) {
+	++limit;
+	usleep(1000);
+	continue;
+      } else {
+	break;
+      }
+    }
+    step(fd, dir, cmd, delay);
+    ++steps;
+  }
+  return steps;
+}
+
+void step(int fd, unsigned char dir, unsigned char cmd, int delay) {
   write_data(fd, dir | cmd);
   write_data(fd, dir);
+
+  if(delay > 0) {
+    usleep(delay);
+  }
 }
 
 int write_data(int fd, unsigned char data) {

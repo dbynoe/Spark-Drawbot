@@ -20,6 +20,7 @@
 
 #define FAULT PARPORT_STATUS_ERROR
 
+#define AXIS(fwd, rev) AXIS_REVERSE(AXIS_FORWARD(0, fwd), rev)
 #define AXIS_FORWARD(data, axis) ((data) | (axis))
 #define AXIS_REVERSE(data, axis) ((data) & ~(axis))
 
