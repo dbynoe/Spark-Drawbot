@@ -1,7 +1,8 @@
 all: drawbot
 
-drawbot: drawbot.c
-	gcc -std=c99 -lm -o drawbot drawbot.c
+drawbot:
+	$(MAKE) -C daemon
+
 
 clean:
-	rm -f drawbot
+	$(MAKE) -C daemon clean
