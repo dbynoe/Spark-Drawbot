@@ -1,3 +1,5 @@
+.PHONY: drawbot kinematics
+
 all: drawbot kinematics
 
 drawbot:
