@@ -1,18 +1,14 @@
-CC=gcc
-CCFLAGS=-c -std=c99 -lm
+CC=comp
+CCFLAGS=--compile
 LDFLAGS=
 
-SOURCES=drawkins.c
-OBJECTS=$(SOURCES:.c=.o)
-TARGET=drawkins
+SOURCES=$(wildcard *.c)
+COMPONENTS=$(SOURCES:.c=.ko)
 
-all: $(TARGET)
+all: $(COMPONENTS)
 
-$(TARGET): $(OBJECTS)
-	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
-
-.c.o:
-	$(CC) $(CCFLAGS) $< -o $@
+%.ko: %.c
+	$(CC) $(CCFLAGS) $<
 
 clean:
-	rm -f $(TARGET) *.o
+	rm -f *.ko
