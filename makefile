@@ -1,13 +1,13 @@
-.PHONY: drawbot kinematics
+SUBDIRS=daemon kinematics
+TARGET=
 
-all: drawbot kinematics
+.PHONY: $(SUBDIRS)
 
-drawbot:
-	$(MAKE) -C daemon
+all: $(SUBDIRS)
 
-kinematics:
-	$(MAKE) -C kinematics
+$(SUBDIRS):
+	$(MAKE) -C $@ $(TARGET)
 
-clean:
-	$(MAKE) -C daemon clean
-	$(MAKE) -C kinematics clean
+
+clean: TARGET=clean
+clean: $(SUBDIRS)
