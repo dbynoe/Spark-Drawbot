@@ -7,6 +7,9 @@ COMPONENTS=$(SOURCES:.c=.ko)
 
 all: $(COMPONENTS)
 
+install: CCFLAGS = --install
+install: $(COMPONENTS)
+
 %.ko: %.c
 	$(CC) $(CCFLAGS) $<
 

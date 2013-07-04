@@ -6,6 +6,8 @@ SOURCES=$(wildcard *.c)
 OBJECTS=$(SOURCES:.c=.o)
 TARGET=drawbotd
 
+.PHONY: install
+
 all: $(TARGET)
 
 $(TARGET): $(OBJECTS)
@@ -13,6 +15,8 @@ $(TARGET): $(OBJECTS)
 
 .c.o:
 	$(CC) $(CCFLAGS) $< -o $@
+
+install:
 
 clean:
 	rm -f $(TARGET) *.o
