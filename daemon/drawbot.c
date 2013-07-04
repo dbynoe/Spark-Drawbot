@@ -16,7 +16,7 @@
 
 #define DEBOUNCE_COUNT 16
 
-volatile int shutdown = 0;
+extern volatile int shutdown;
 
 struct axis_state {
   int x, y, z, a;
@@ -39,6 +39,7 @@ void sig_shutdown(int);
 int zero(const int, struct axis_state *p);
 void step(int fd, unsigned char, unsigned char, int);
 
+/*
 int main(int argc, char *argv[]) {
   int fd;
   char *device = NULL;
@@ -100,6 +101,7 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
+*/
 
 int zero(const int fd, struct axis_state *state) {
   int delay = 500;
