@@ -7,6 +7,8 @@ COMPONENTS=$(SOURCES:.c=.ko)
 
 all: $(COMPONENTS)
 
+.PHONY: install
+
 install: CCFLAGS = --install
 install: $(COMPONENTS)
 
