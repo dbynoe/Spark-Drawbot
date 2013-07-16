@@ -4,20 +4,19 @@
 #include "rtapi_math.h"
 #include "hal.h"
 
+struct hal_axis_home {
+	hal_float_t *cmd, *fb;
+
+	hal_bit_t *home;
+};
+
 struct haldata {
-  hal_float_t *x, *y, *z, *a;
-  hal_float_t *xy, *xz, *xa;
-  hal_float_t *yz, *ya, *za;
+	hal_float_t *xy, *xz, *xa;
+	hal_float_t *yz, *ya, *za;
 
-  hal_float_t *fbx, *fby, *fbz, *fba;
-
-  hal_bit_t *homing;
+	hal_bit_t *homing;
+	hal_axis_home x, y, z, a;
 } *haldata = 0;
-
-#define X (*(haldata->x))
-#define Y (*(haldata->y))
-#define Z (*(haldata->z))
-#define A (*(haldata->a))
 
 EXPORT_SYMBOL(kinematicsType);
 EXPORT_SYMBOL(kinematicsForward);
@@ -25,6 +24,7 @@ EXPORT_SYMBOL(kinematicsInverse);
 EXPORT_SYMBOL(kinematicsHome);
 
 void drawbot_home(void*, long);
+int export_homing_axis(int);
 
 int comp_id;
 
@@ -64,8 +64,10 @@ int rtapi_app_main(void) {
     // Homing function
     if((status = hal_export_funct("drawbot.home", drawbot_home, NULL, 1, 0, comp_id)) < 0) break;
 
-    // Axis feedback
-    if((status = hal_pin_float_new("drawbot.home.0.position-fb", )
+	if((status = export_homing_axis(0, &(haldata->x))) < 0) break;
+	if((status = export_homing_axis(1, &(haldata->y))) < 0) break;
+	if((status = export_homing_axis(2, &(haldata->z))) < 0) break;
+	if((status = export_homing_axis(3, &(haldata->a))) < 0) break;
   } while(0);
 
   if(status) {
@@ -123,7 +125,20 @@ KINEMATICS_TYPE kinematicsType(void) {
 }
 
 void drawbot_home(void *args, long period) {
-  if(*(haldata->homing)) {
-    
-  }
+	if(*(haldata->homing)) {
+		*(haldata->homing) = 0;
+	}
+}
+
+int export_homing_axis(int num, hal_axis_home *axis) {
+	int status = 0;
+
+	do {
+		if((status = hal_pin_float_newf(HAL_OUT, &(axis->cmd), comp_id, "drawbot.%d.position-cmd", num)) < 0) break;
+		if((status = hal_pin_float_newf(HAL_IN, &(axis->fb), comp_id, "drawbot.%d.position-fb", num)) < 0) break;
+
+		if((status = hal_pin_bit_newf(HAL_IN, &(axis->home), comp_id, "drawbot.%d.home-sw-in", num)) < 0) break;
+	} while(false);
+
+	return status;
 }
