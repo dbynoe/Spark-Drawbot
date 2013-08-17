@@ -4,10 +4,16 @@
 #include "rtapi_math.h"
 #include "hal.h"
 
+#define FB_TOLERANCE 1E-3
+
 struct hal_joint_t {
   hal_bit_t *homed;
   hal_bit_t *home_switch;
   hal_bit_t *home;
+
+  hal_float_t *cmd;
+  hal_float_t *fb;
+  hal_float_t *jog;
 };
 
 struct haldata {
@@ -15,7 +21,7 @@ struct haldata {
   hal_float_t *yz, *ya, *za;
 
   hal_bit_t *homing;
-  hal_bit_t *running;
+  hal_bit_t *occupied;
 
   struct hal_joint_t joint[4];
 } *haldata = 0;
@@ -25,8 +31,16 @@ EXPORT_SYMBOL(kinematicsForward);
 EXPORT_SYMBOL(kinematicsInverse);
 EXPORT_SYMBOL(kinematicsHome);
 
-void drawbot_home(void*, long);
 int export_joint(int, struct hal_joint_t*);
+
+void drawbot_home(void*, long);
+void drawbot_home_x(struct hal_joint_t*, struct hal_joint_t*, struct hal_joint_t*, struct hal_joint_t*);
+void drawbot_home_y(struct hal_joint_t*, struct hal_joint_t*, struct hal_joint_t*, struct hal_joint_t*);
+void drawbot_home_z(struct hal_joint_t*, struct hal_joint_t*, struct hal_joint_t*, struct hal_joint_t*);
+void drawbot_home_a(struct hal_joint_t*, struct hal_joint_t*, struct hal_joint_t*, struct hal_joint_t*);
+
+int is_moving(struct hal_joint_t*, struct hal_joint_t*, struct hal_joint_t*, struct hal_joint_t*);
+int is_joint_moving(struct hal_joint_t*);
 
 int comp_id;
 
@@ -56,7 +70,7 @@ int rtapi_app_main(void) {
     if((status = hal_pin_float_new("drawbot.extent.za", HAL_OUT, &(haldata->za), comp_id)) < 0) break;
 
     if((status = hal_pin_bit_new("drawbot.is-homing", HAL_OUT, &(haldata->homing), comp_id)) < 0) break;
-    if((status = hal_pin_bit_new("drawbot.is-running", HAL_IN, &(haldata->running), comp_id)) < 0) break;
+    if((status = hal_pin_bit_new("drawbot.is-occupied", HAL_IN, &(haldata->occupied), comp_id)) < 0) break;
 
     if((status = export_joint(0, &(haldata->joint[0]))) < 0) break;
     if((status = export_joint(1, &(haldata->joint[1]))) < 0) break;
@@ -85,6 +99,11 @@ int export_joint(int num, struct hal_joint_t *joint) {
     if((status = hal_pin_bit_newf(HAL_IN, &(joint->homed), comp_id, "drawbot.%d.is-homed", num)) < 0) break;
     if((status = hal_pin_bit_newf(HAL_IN, &(joint->home_switch), comp_id, "drawbot.%d.home-sw", num)) < 0) break;
     if((status = hal_pin_bit_newf(HAL_OUT, &(joint->home), comp_id, "drawbot.%d.home", num)) < 0) break;
+
+    if((status = hal_pin_float_newf(HAL_IN, &(joint->cmd), comp_id, "drawbot.%d.pos-cmd", num)) < 0) break;
+    if((status = hal_pin_float_newf(HAL_IN, &(joint->fb), comp_id, "drawbot.%d.pos-fb", num)) < 0) break;
+
+    if((status = hal_pin_float_newf(HAL_OUT, &(joint->jog), comp_id, "drawbot.%d.pos-jog", num)) < 0) break;
   } while(false);
 
   return status;
@@ -133,61 +152,43 @@ KINEMATICS_TYPE kinematicsType(void) {
 }
 
 void drawbot_home(void *args, long period) {
-  int idx, state = 0;
-
-  if(*(haldata->running)) {
-    *(haldata->homing) = 0;
-    return;
+  int homing = 1;
+  if(*(haldata->occupied)) {
+    homing = 0;
+  } else if(!*(haldata->joint[0].homed)) {
+    drawbot_home_x(&(haldata->joint[0]), &(haldata->joint[1]), &(haldata->joint[2]), &(haldata->joint[3]));
+  } else if(!*(haldata->joint[2].homed)) {
+    drawbot_home_z(&(haldata->joint[0]), &(haldata->joint[1]), &(haldata->joint[2]), &(haldata->joint[3]));
+  } else if(!*(haldata->joint[1].homed)) {
+    drawbot_home_y(&(haldata->joint[0]), &(haldata->joint[1]), &(haldata->joint[2]), &(haldata->joint[3]));
+  } else if(!*(haldata->joint[3].homed)) {
+    drawbot_home_a(&(haldata->joint[0]), &(haldata->joint[1]), &(haldata->joint[2]), &(haldata->joint[3]));
+  } else {
+    homing = 0;
   }
+  *(haldata->homing) = homing;
+}
 
-  for(idx = 0; idx < 4; ++idx) {
-    if(*(haldata->joint[idx].homed)) {
-      *(haldata->joint[idx].home) = 0;
-      state |= (1 << idx);
-    } else if(*(haldata->joint[idx].home_switch)) {
-      *(haldata->joint[idx].home) = 1;
-      state |= (1 << idx);
-    } else {
-      *(haldata->joint[idx].home) = 0;
-    }
+void drawbot_home_x(struct hal_joint_t *x, struct hal_joint_t *y, struct hal_joint_t *z, struct hal_joint_t *a) {
+}
+
+void drawbot_home_y(struct hal_joint_t *x, struct hal_joint_t *y, struct hal_joint_t *z, struct hal_joint_t *a) {
+}
+
+void drawbot_home_z(struct hal_joint_t *x, struct hal_joint_t *y, struct hal_joint_t *z, struct hal_joint_t *a) {
+}
+
+void drawbot_home_a(struct hal_joint_t *x, struct hal_joint_t *y, struct hal_joint_t *z, struct hal_joint_t *a) {
+}
+
+int is_moving(struct hal_joint_t *x, struct hal_joint_t *y, struct hal_joint_t *z, struct hal_joint_t *a) {
+  return is_joint_moving(x) || is_joint_moving(y) || is_joint_moving(z) || is_joint_moving(a);
+}
+
+int is_joint_moving(struct hal_joint_t *joint) {
+  hal_float_t delta = *(joint->cmd) - *(joint->fb);
+  if(delta < 0.0) {
+    delta = -delta;
   }
-
-  if(state = 0xf) {
-	*(haldata->homing) = 0;
-	return;
-  }
-
-  *(haldata->homing) = 1;
-
-  switch(state) {
-  case 0x0:
-  case 0x2:
-  case 0x4:
-  case 0x6:
-  case 0x8:
-  case 0xa:
-  case 0xc:
-  case 0xe:
-	// Home X
-	break;
-
-  case 0x1:
-  case 0x3:
-  case 0x9:
-  case 0xb:
-	// Home Z
-	break;
-
-  case 0x5:
-  case 0xd:
-
-	// Home Y
-	break;
-
-  case 0x7:
-	// Home A
-	break;
-
-  default:;
-  }
+  return delta > FB_TOLERANCE;
 }
