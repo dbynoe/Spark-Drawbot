@@ -7,6 +7,7 @@ loadrt drawbotkins
 loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[TRAJ]AXES
 loadrt probe_parport
 loadrt hal_parport cfg="0x378 out  "
+loadrt debounce cfg=4
 
 setp parport.0.reset-time 1000
 
@@ -24,10 +25,7 @@ addf charge-pump base-thread
 addf pwmgen.make-pulses base-thread
 addf parport.0.write base-thread
 addf parport.0.reset base-thread
-addf mux2.0 base-thread
-addf mux2.1 base-thread
-addf mux2.2 base-thread
-addf mux2.3 base-thread
+addf debounce.0 base-thread
 
 # Add all servo thread functions
 addf stepgen.capture-position servo-thread
@@ -71,10 +69,10 @@ net charge-pump => parport.0.pin-16-out
 net dout-00 => parport.0.pin-17-out
 
 # Configure parallel port input
-net min-x <= parport.0.pin-10-in
-net min-y <= parport.0.pin-11-in
-net min-z <= parport.0.pin-12-in
-net min-a <= parport.0.pin-13-in
+net raw-min-x <= parport.0.pin-10-in
+net raw-min-y <= parport.0.pin-11-in
+net raw-min-z <= parport.0.pin-12-in
+net raw-min-a <= parport.0.pin-13-in
 net estop-ext <= parport.0.pin-15-in-not
 
 loadrt mux2 count=4
@@ -110,27 +108,10 @@ setp stepgen.1.maxaccel [AXIS_1]STEPGEN_MAXACCEL
 setp stepgen.2.maxaccel [AXIS_2]STEPGEN_MAXACCEL
 setp stepgen.3.maxaccel [AXIS_3]STEPGEN_MAXACCEL
 
-# Configure homing sequence selection
-net homing <= drawbot.homing
-net homing => mux2.0.sel
-net homing => mux2.1.sel
-net homing => mux2.2.sel
-net homing => mux2.3.sel
-
-net xpos-mot-cmd <= axis.0.motor-pos-cmd => mux2.0.in0
-net ypos-mot-cmd <= axis.1.motor-pos-cmd => mux2.1.in0
-net zpos-mot-cmd <= axis.2.motor-pos-cmd => mux2.2.in0
-net apos-mot-cmd <= axis.3.motor-pos-cmd => mux2.3.in0
-
-net xpos-home-cmd <= drawbot.0.position-cmd => mux2.0.in1
-net ypos-home-cmd <= drawbot.1.position-cmd => mux2.1.in1
-net zpos-home-cmd <= drawbot.2.position-cmd => mux2.2.in1
-net apos-home-cmd <= drawbot.3.position-cmd => mux2.3.in1
-
-net xpos-cmd <= mux2.0.out => stepgen.0.position-cmd
-net ypos-cmd <= mux2.1.out => stepgen.1.position-cmd
-net zpos-cmd <= mux2.2.out => stepgen.2.position-cmd
-net apos-cmd <= mux2.3.out => stepgen.3.position-cmd
+net xpos-cmd <= axis.0.motor-pos-cmd => stepgen.0.position-cmd
+net ypos-cmd <= axis.1.motor-pos-cmd => stepgen.1.position-cmd
+net zpos-cmd <= axis.2.motor-pos-cmd => stepgen.2.position-cmd
+net apos-cmd <= axis.3.motor-pos-cmd => stepgen.3.position-cmd
 
 net xpos-fb stepgen.0.position-fb => axis.0.motor-pos-fb
 net ypos-fb stepgen.1.position-fb => axis.1.motor-pos-fb
@@ -157,15 +138,26 @@ net yenable axis.1.amp-enable-out => stepgen.1.enable
 net zenable axis.2.amp-enable-out => stepgen.2.enable
 net aenable axis.3.amp-enable-out => stepgen.3.enable
 
+# Debounce the home switch inputs
+net raw-min-x => debounce.0.0.in
+net raw-min-y => debounce.0.1.in
+net raw-min-z => debounce.0.2.in
+net raw-min-a => debounce.0.3.in
+
+net min-x <= debounce.0.0.out
+net min-x <= debounce.0.1.out
+net min-x <= debounce.0.2.out
+net min-x <= debounce.0.3.out
+
 net min-x => axis.0.home-sw-in
 net min-y => axis.1.home-sw-in
 net min-z => axis.2.home-sw-in
 net min-a => axis.3.home-sw-in
 
-net min-x => axis.0.neg-lim-sw-in
-net min-y => axis.1.neg-lim-sw-in
-net min-z => axis.2.neg-lim-sw-in
-net min-a => axis.3.neg-lim-sw-in
+#net min-x => axis.0.neg-lim-sw-in
+#net min-y => axis.1.neg-lim-sw-in
+#net min-z => axis.2.neg-lim-sw-in
+#net min-a => axis.3.neg-lim-sw-in
 
 net estop-out <= iocontrol.0.user-enable-out
 net estop-ext => iocontrol.0.emc-enable-in
