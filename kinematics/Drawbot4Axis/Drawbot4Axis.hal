@@ -9,8 +9,6 @@ loadrt probe_parport
 loadrt hal_parport cfg="0x378 out  "
 loadrt debounce cfg=4
 
-# TODO this needs to be a dynamic path to the ini file or something
-loadusr halui -ini Drawbot4Axis.ini
 
 setp parport.0.reset-time 1000
 
