@@ -9,6 +9,9 @@ loadrt probe_parport
 loadrt hal_parport cfg="0x378 out  "
 loadrt debounce cfg=4
 
+# TODO this needs to be a dynamic path to the ini file or something
+loadusr halui -ini Drawbot4Axis.ini
+
 setp parport.0.reset-time 1000
 
 loadrt stepgen step_type=0,0,0,0
@@ -75,8 +78,6 @@ net raw-min-z <= parport.0.pin-12-in
 net raw-min-a <= parport.0.pin-13-in
 net estop-ext <= parport.0.pin-15-in-not
 
-loadrt mux2 count=4
-
 # Configure step generation
 setp stepgen.0.position-scale [AXIS_0]SCALE
 setp stepgen.1.position-scale [AXIS_1]SCALE
@@ -118,10 +119,10 @@ net ypos-fb stepgen.1.position-fb => axis.1.motor-pos-fb
 net zpos-fb stepgen.2.position-fb => axis.2.motor-pos-fb
 net apos-fb stepgen.3.position-fb => axis.3.motor-pos-fb
 
-net xpos-fb stepgen.0.position-fb => drawbot.0.position-fb
-net ypos-fb stepgen.1.position-fb => drawbot.1.position-fb
-net zpos-fb stepgen.2.position-fb => drawbot.2.position-fb
-net apos-fb stepgen.3.position-fb => drawbot.3.position-fb
+#net xpos-fb stepgen.0.position-fb => drawbot.0.position-fb
+#net ypos-fb stepgen.1.position-fb => drawbot.1.position-fb
+#net zpos-fb stepgen.2.position-fb => drawbot.2.position-fb
+#net apos-fb stepgen.3.position-fb => drawbot.3.position-fb
 
 net xstep <= stepgen.0.step
 net ystep <= stepgen.1.step
@@ -144,20 +145,31 @@ net raw-min-y => debounce.0.1.in
 net raw-min-z => debounce.0.2.in
 net raw-min-a => debounce.0.3.in
 
-net min-x <= debounce.0.0.out
-net min-x <= debounce.0.1.out
-net min-x <= debounce.0.2.out
-net min-x <= debounce.0.3.out
+net min-x <= debounce.0.0.out => axis.0.home-sw-in
+net min-y <= debounce.0.1.out => axis.1.home-sw-in
+net min-z <= debounce.0.2.out => axis.2.home-sw-in
+net min-a <= debounce.0.3.out => axis.3.home-sw-in
 
-net min-x => axis.0.home-sw-in
-net min-y => axis.1.home-sw-in
-net min-z => axis.2.home-sw-in
-net min-a => axis.3.home-sw-in
+#Attach halui
+net is-running <= halui.program.is-running => drawbot.is-running
 
-#net min-x => axis.0.neg-lim-sw-in
-#net min-y => axis.1.neg-lim-sw-in
-#net min-z => axis.2.neg-lim-sw-in
-#net min-a => axis.3.neg-lim-sw-in
+# Joint homed state
+net homed-x <= halui.joint.0.is-homed => drawbot.0.is-homed
+net homed-y <= halui.joint.1.is-homed => drawbot.1.is-homed
+net homed-z <= halui.joint.2.is-homed => drawbot.2.is-homed
+net homed-a <= halui.joint.3.is-homed => drawbot.3.is-homed
+
+# Joint home switches
+net min-x => drawbot.0.home-sw
+net min-y => drawbot.1.home-sw
+net min-z => drawbot.2.home-sw
+net min-a => drawbot.3.home-sw
+
+# Joint home commands
+net home-x <= drawbot.0.home => halui.joint.0.home
+net home-y <= drawbot.1.home => halui.joint.1.home
+net home-z <= drawbot.2.home => halui.joint.2.home
+net home-a <= drawbot.3.home => halui.joint.3.home
 
 net estop-out <= iocontrol.0.user-enable-out
 net estop-ext => iocontrol.0.emc-enable-in

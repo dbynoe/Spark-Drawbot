@@ -4,18 +4,20 @@
 #include "rtapi_math.h"
 #include "hal.h"
 
-struct hal_axis_home {
-	hal_float_t *cmd, *fb;
-
-	hal_bit_t *home;
+struct hal_joint_t {
+  hal_bit_t *homed;
+  hal_bit_t *home_switch;
+  hal_bit_t *home;
 };
 
 struct haldata {
-	hal_float_t *xy, *xz, *xa;
-	hal_float_t *yz, *ya, *za;
+  hal_float_t *xy, *xz, *xa;
+  hal_float_t *yz, *ya, *za;
 
-	hal_bit_t *homing;
-	hal_axis_home x, y, z, a;
+  hal_bit_t *homing;
+  hal_bit_t *running;
+
+  struct hal_joint_t joint[4];
 } *haldata = 0;
 
 EXPORT_SYMBOL(kinematicsType);
@@ -24,7 +26,7 @@ EXPORT_SYMBOL(kinematicsInverse);
 EXPORT_SYMBOL(kinematicsHome);
 
 void drawbot_home(void*, long);
-int export_homing_axis(int);
+int export_joint(int, struct hal_joint_t*);
 
 int comp_id;
 
@@ -43,31 +45,25 @@ int rtapi_app_main(void) {
       break;
     }
 
-    // Current motor positions
-    if((status = hal_pin_float_new("drawbot.kins.pos.x", HAL_IO, &(haldata->x), comp_id)) < 0) break;
-    if((status = hal_pin_float_new("drawbot.kins.pos.y", HAL_IO, &(haldata->y), comp_id)) < 0) break;
-    if((status = hal_pin_float_new("drawbot.kins.pos.z", HAL_IO, &(haldata->z), comp_id)) < 0) break;
-    if((status = hal_pin_float_new("drawbot.kins.pos.a", HAL_IO, &(haldata->a), comp_id)) < 0) break;
-
     // Maximum draw area extents
-    if((status = hal_pin_float_new("drawbot.kins.extent.xy", HAL_OUT, &(haldata->xy), comp_id)) < 0) break;
-    if((status = hal_pin_float_new("drawbot.kins.extent.xz", HAL_OUT, &(haldata->xz), comp_id)) < 0) break;
-    if((status = hal_pin_float_new("drawbot.kins.extent.xa", HAL_OUT, &(haldata->xa), comp_id)) < 0) break;
+    if((status = hal_pin_float_new("drawbot.extent.xy", HAL_OUT, &(haldata->xy), comp_id)) < 0) break;
+    if((status = hal_pin_float_new("drawbot.extent.xz", HAL_OUT, &(haldata->xz), comp_id)) < 0) break;
+    if((status = hal_pin_float_new("drawbot.extent.xa", HAL_OUT, &(haldata->xa), comp_id)) < 0) break;
 
-    if((status = hal_pin_float_new("drawbot.kins.extent.yz", HAL_OUT, &(haldata->yz), comp_id)) < 0) break;
-    if((status = hal_pin_float_new("drawbot.kins.extent.ya", HAL_OUT, &(haldata->ya), comp_id)) < 0) break;
+    if((status = hal_pin_float_new("drawbot.extent.yz", HAL_OUT, &(haldata->yz), comp_id)) < 0) break;
+    if((status = hal_pin_float_new("drawbot.extent.ya", HAL_OUT, &(haldata->ya), comp_id)) < 0) break;
 
-    if((status = hal_pin_float_new("drawbot.kins.extent.za", HAL_OUT, &(haldata->za), comp_id)) < 0) break;
+    if((status = hal_pin_float_new("drawbot.extent.za", HAL_OUT, &(haldata->za), comp_id)) < 0) break;
 
-    if((status = hal_pin_bit_new("drawbot.homing", HAL_IO, &(haldata->homing), comp_id)) < 0) break;
+    if((status = hal_pin_bit_new("drawbot.is-homing", HAL_OUT, &(haldata->homing), comp_id)) < 0) break;
+    if((status = hal_pin_bit_new("drawbot.is-running", HAL_IN, &(haldata->running), comp_id)) < 0) break;
 
-    // Homing function
+    if((status = export_joint(0, &(haldata->joint[0]))) < 0) break;
+    if((status = export_joint(1, &(haldata->joint[1]))) < 0) break;
+    if((status = export_joint(2, &(haldata->joint[2]))) < 0) break;
+    if((status = export_joint(3, &(haldata->joint[3]))) < 0) break;
+
     if((status = hal_export_funct("drawbot.home", drawbot_home, NULL, 1, 0, comp_id)) < 0) break;
-
-	if((status = export_homing_axis(0, &(haldata->x))) < 0) break;
-	if((status = export_homing_axis(1, &(haldata->y))) < 0) break;
-	if((status = export_homing_axis(2, &(haldata->z))) < 0) break;
-	if((status = export_homing_axis(3, &(haldata->a))) < 0) break;
   } while(0);
 
   if(status) {
@@ -80,6 +76,18 @@ int rtapi_app_main(void) {
 
 void rtapi_app_exit(void) {
   hal_exit(comp_id);
+}
+
+int export_joint(int num, struct hal_joint_t *joint) {
+  int status = 0;
+
+  do {
+    if((status = hal_pin_bit_newf(HAL_IN, &(joint->homed), comp_id, "drawbot.%d.is-homed", num)) < 0) break;
+    if((status = hal_pin_bit_newf(HAL_IN, &(joint->home_switch), comp_id, "drawbot.%d.home-sw", num)) < 0) break;
+    if((status = hal_pin_bit_newf(HAL_OUT, &(joint->home), comp_id, "drawbot.%d.home", num)) < 0) break;
+  } while(false);
+
+  return status;
 }
 
 int kinematicsForward(const double *joints,
@@ -106,10 +114,10 @@ int kinematicsHome(EmcPose *world,
   *fflags = 0;
   *iflags = 0;
 
-  joints[0] = *(haldata->x);
-  joints[1] = *(haldata->y);
-  joints[2] = *(haldata->z);
-  joints[3] = *(haldata->a);
+  joints[0] = 0;
+  joints[1] = 0;
+  joints[2] = 0;
+  joints[3] = 0;
 
   joints[4] = 0;
   joints[5] = 0;
@@ -125,20 +133,46 @@ KINEMATICS_TYPE kinematicsType(void) {
 }
 
 void drawbot_home(void *args, long period) {
-	if(*(haldata->homing)) {
-		*(haldata->homing) = 0;
-	}
-}
+  int idx, state = 0;
 
-int export_homing_axis(int num, hal_axis_home *axis) {
-	int status = 0;
+  if(*(haldata->running)) {
+    *(haldata->homing) = 0;
+    return;
+  }
 
-	do {
-		if((status = hal_pin_float_newf(HAL_OUT, &(axis->cmd), comp_id, "drawbot.%d.position-cmd", num)) < 0) break;
-		if((status = hal_pin_float_newf(HAL_IN, &(axis->fb), comp_id, "drawbot.%d.position-fb", num)) < 0) break;
+  for(idx = 0; idx < 4; ++idx) {
+    if(*(haldata->joint[idx].homed)) {
+      *(haldata->joint[idx].home) = 0;
+      state |= (1 << idx);
+    } else if(*(haldata->joint[idx].home_switch)) {
+      *(haldata->joint[idx].home) = 1;
+      state |= (1 << idx);
+    } else {
+      *(haldata->joint[idx].home) = 0;
+    }
+  }
 
-		if((status = hal_pin_bit_newf(HAL_IN, &(axis->home), comp_id, "drawbot.%d.home-sw-in", num)) < 0) break;
-	} while(false);
-
-	return status;
+  switch(state) {
+  case 0x0:
+  case 0x1:
+  case 0x2:
+  case 0x3:
+  case 0x4:
+  case 0x5:
+  case 0x6:
+  case 0x7:
+  case 0x8:
+  case 0x9:
+  case 0xa:
+  case 0xb:
+  case 0xc:
+  case 0xd:
+  case 0xe:
+    *(haldata->homing) = 1;
+    return;
+  case 0xf:
+  default:
+    *(haldata->homing) = 0;
+    return;
+  }
 }
