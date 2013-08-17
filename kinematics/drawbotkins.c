@@ -152,27 +152,42 @@ void drawbot_home(void *args, long period) {
     }
   }
 
+  if(state = 0xf) {
+	*(haldata->homing) = 0;
+	return;
+  }
+
+  *(haldata->homing) = 1;
+
   switch(state) {
   case 0x0:
-  case 0x1:
   case 0x2:
-  case 0x3:
   case 0x4:
-  case 0x5:
   case 0x6:
-  case 0x7:
   case 0x8:
-  case 0x9:
   case 0xa:
-  case 0xb:
   case 0xc:
-  case 0xd:
   case 0xe:
-    *(haldata->homing) = 1;
-    return;
-  case 0xf:
-  default:
-    *(haldata->homing) = 0;
-    return;
+	// Home X
+	break;
+
+  case 0x1:
+  case 0x3:
+  case 0x9:
+  case 0xb:
+	// Home Z
+	break;
+
+  case 0x5:
+  case 0xd:
+
+	// Home Y
+	break;
+
+  case 0x7:
+	// Home A
+	break;
+
+  default:;
   }
 }
