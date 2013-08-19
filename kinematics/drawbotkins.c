@@ -25,6 +25,9 @@ struct haldata {
   hal_float_t *dimy;
   hal_float_t *dimz;
 
+	hal_float_t *limx;
+	hal_float_t *limy;
+
   hal_bit_t *homing;
   hal_bit_t *occupied;
 
@@ -68,6 +71,9 @@ int rtapi_app_main(void) {
     if((status = hal_pin_float_new("drawbot.extent.dim-x", HAL_IN, &(haldata->dimx), comp_id)) < 0) break;
     if((status = hal_pin_float_new("drawbot.extent.dim-y", HAL_IN, &(haldata->dimy), comp_id)) < 0) break;
     if((status = hal_pin_float_new("drawbot.extent.dim-z", HAL_IN, &(haldata->dimz), comp_id)) < 0) break;
+
+	if((status = hal_pin_float_new("drawbot.extent.lim-x", HAL_IN, &(haldata->limx), comp_id)) < 0) break;
+    if((status = hal_pin_float_new("drawbot.extent.lim-y", HAL_IN, &(haldata->limy), comp_id)) < 0) break;
 
     if((status = hal_pin_bit_new("drawbot.is-homing", HAL_OUT, &(haldata->homing), comp_id)) < 0) break;
     if((status = hal_pin_bit_new("drawbot.is-occupied", HAL_IN, &(haldata->occupied), comp_id)) < 0) break;
@@ -126,16 +132,28 @@ int kinematicsInverse(const EmcPose *pos,
   int idx, sx = -1, sy = 1, nx, ny;
   double dx, dy, dz;
 
+	double limx = 0.5 * sx * fmin(*(haldata->dimx), *(haldata->limx));
+	double limy = 0.5 * sx * fmin(*(haldata->dimy), *(haldata->limy));
+	double limz = *(haldata->dimz);
+
+	// Check our limits
+	if(pos->tran.x < -limx || pos->tran.x > limx
+		|| pos->tran.y < -limy || pos->tran.y > limy
+		|| pos->tran.z > limz || pos->tran.z < 0.0)
+	{
+		return -1;
+	}
+
   for(idx = 0; idx < 4; ++idx) {
     double tower_x = 0.5 * sx * *(haldata->dimx);
     double tower_y = 0.5 * sy * *(haldata->dimy);
 
-    double carriage_x = pos->tran.x + rt2 * sx * *(haldata->radius);
-    double carriage_y = pos->tran.y + rt2 * sy * *(haldata->radius);
+    double carriage_x = x + rt2 * sx * *(haldata->radius);
+    double carriage_y = y + rt2 * sy * *(haldata->radius);
 
     dx = carriage_x - tower_x;
     dy = carriage_y - tower_y;
-    dz = pos->tran.z - *(haldata->dimz);
+    dz = z - *(haldata->dimz);
 
     joints[idx] = sqrt(dx*dx + dy*dy + dz*dz) - *(haldata->limit);
     if(joints[idx] < 0.0) {
@@ -158,21 +176,15 @@ int kinematicsHome(EmcPose *world,
 		   KINEMATICS_FORWARD_FLAGS *fflags,
 		   KINEMATICS_INVERSE_FLAGS *iflags)
 {
+	int idx;
   double hypot = sqrt(*(haldata->dimx) * *(haldata->dimx) + *(haldata->dimy) * *(haldata->dimy));
 
   *fflags = 0;
   *iflags = 0;
 
-  joints[0] = 0.5 * hypot - *(haldata->radius);
-  joints[1] = 0.5 * hypot - *(haldata->radius);
-  joints[2] = 0.5 * hypot - *(haldata->radius);
-  joints[3] = 0.5 * hypot - *(haldata->radius);
-
-  joints[4] = 0;
-  joints[5] = 0;
-  joints[6] = 0;
-  joints[7] = 0;
-  joints[8] = 0;
+	for(idx = 0; idx < 9; ++ idx) {
+		joints[idx] = idx < 4 ? 0.5 * hypot - *(haldata->radius) : 0.0;
+	}
 
   // Because of the way the ZERO_EMC_POSE macro the extra parens are mandatory
   ZERO_EMC_POSE((*world));

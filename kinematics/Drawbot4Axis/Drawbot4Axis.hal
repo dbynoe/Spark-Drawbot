@@ -185,6 +185,9 @@ setp drawbot.extent.dim-x 848.0
 setp drawbot.extent.dim-y 848.0
 setp drawbot.extent.dim-z 200.0
 
+setp drawbot.extent.lim-x 500.0
+setp drawbot.extent.lim-y 500.0
+
 # Coordinate mode
 net jog-joint <= drawbot.is-homing
 net jog-joint => halui.mode.joint
