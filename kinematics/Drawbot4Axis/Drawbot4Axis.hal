@@ -177,16 +177,15 @@ net occupied-delay <= or2.0.out => timedelay.0.in
 net is-occupied <= timedelay.0.out => drawbot.is-occupied
 
 # Drawbot extents
-# TODO: this should load from the ini file
-setp drawbot.extent.radius 25.0
-setp drawbot.extent.limit 30.0
+setp drawbot.extent.radius [DRAWBOT]CARRIAGE_RADIUS
+setp drawbot.extent.limit [DRAWBOT]HOME_OFFSET
 
-setp drawbot.extent.dim-x 848.0
-setp drawbot.extent.dim-y 848.0
-setp drawbot.extent.dim-z 200.0
+setp drawbot.extent.dim-x [DRAWBOT]DIMENSION_X
+setp drawbot.extent.dim-y [DRAWBOT]DIMENSION_Y
+setp drawbot.extent.dim-z [DRAWBOT]DIMENSION_Z
 
-setp drawbot.extent.lim-x 500.0
-setp drawbot.extent.lim-y 500.0
+setp drawbot.extent.lim-x [DRAWBOT]LIMIT_X
+setp drawbot.extent.lim-y [DRAWBOT]LIMIT_Y
 
 # Coordinate mode
 net jog-joint <= drawbot.is-homing
