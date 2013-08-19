@@ -121,7 +121,36 @@ int kinematicsInverse(const EmcPose *pos,
 		      const KINEMATICS_INVERSE_FLAGS *iflags,
 		      KINEMATICS_FORWARD_FLAGS *fflags)
 {
-  return -1;
+  const double rt2 = sqrt(2.0);
+
+  int idx, sx = -1, sy = 1, nx, ny;
+  double dx, dy, dz;
+
+  for(idx = 0; idx < 4; ++idx) {
+    double tower_x = 0.5 * sx * *(haldata->dimx);
+    double tower_y = 0.5 * sy * *(haldata->dimy);
+
+    double carriage_x = pos->tran.x + rt2 * sx * *(haldata->radius);
+    double carriage_y = pos->tran.y + rt2 * sy * *(haldata->radius);
+
+    dx = carriage_x - tower_x;
+    dy = carriage_y - tower_y;
+    dz = pos->tran.z - *(haldata->dimz);
+
+    joints[idx] = sqrt(dx*dx + dy*dy + dz*dz) - *(haldata->limit);
+    if(joints[idx] < 0.0) {
+      joints[idx] = 0.0;
+    }
+
+    nx = sy; ny = -sx;
+    sx = nx; sy = ny;
+  }
+
+  for(; idx < 9; ++idx) {
+    joints[idx] = 0.0;
+  }
+
+  return 0;
 }
 
 int kinematicsHome(EmcPose *world,
@@ -129,13 +158,15 @@ int kinematicsHome(EmcPose *world,
 		   KINEMATICS_FORWARD_FLAGS *fflags,
 		   KINEMATICS_INVERSE_FLAGS *iflags)
 {
+  double hypot = sqrt(*(haldata->dimx) * *(haldata->dimx) + *(haldata->dimy) * *(haldata->dimy));
+
   *fflags = 0;
   *iflags = 0;
 
-  joints[0] = 0;
-  joints[1] = 0;
-  joints[2] = 0;
-  joints[3] = 0;
+  joints[0] = 0.5 * hypot - *(haldata->radius);
+  joints[1] = 0.5 * hypot - *(haldata->radius);
+  joints[2] = 0.5 * hypot - *(haldata->radius);
+  joints[3] = 0.5 * hypot - *(haldata->radius);
 
   joints[4] = 0;
   joints[5] = 0;
@@ -143,7 +174,13 @@ int kinematicsHome(EmcPose *world,
   joints[7] = 0;
   joints[8] = 0;
 
-  return kinematicsForward(joints, world, fflags, iflags);
+  // Because of the way the ZERO_EMC_POSE macro the extra parens are mandatory
+  ZERO_EMC_POSE((*world));
+  world->tran.x = 0.0;
+  world->tran.y = 0.0;
+  world->tran.z = *(haldata->dimz);
+
+  return 0;
 }
 
 KINEMATICS_TYPE kinematicsType(void) {
