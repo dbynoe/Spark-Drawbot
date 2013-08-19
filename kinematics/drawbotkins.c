@@ -260,7 +260,9 @@ void drawbot_home_x(struct hal_joint_t *joint) {
     }
   } else if(!*(joint[0].homed)) {
     *(joint[0].jog) = -1.0;
-    *(joint[2].jog) = *(joint[2].homed) ? 1.0 : 0.62;
+	*(joint[1].jog) = *(joint[1].homed) ? 1.1 * (*(joint[1].feedback) - *(haldata->dimx)) / *(joint[0].feedback) : 0.11;
+	*(joint[2].jog) = *(joint[2].homed) ? 1.0 : 0.62;
+	*(joint[3].jog) = *(joint[3].homed) ? 1.1 * (*(joint[3].feedback) - *(haldata->dimy)) / *(joint[0].feedback) : 0.11;
   }
 }
 
@@ -286,8 +288,10 @@ void drawbot_home_z(struct hal_joint_t *joint) {
       halt_motion(joint);
     }
   } else if(!*(joint[2].homed)) {
-    *(joint[0].jog) = 1.0;
+    *(joint[0].jog) = *(joint[0].homed) ? 1.0 : 0.62;
+	*(joint[1].jog) = *(joint[1].homed) ? 1.1 * (*(joint[1].feedback) - *(haldata->dimx)) / *(joint[2].feedback) : 0.11;
     *(joint[2].jog) = -1.0;
+	*(joint[3].jog) = *(joint[3].homed) ? 1.1 * (*(joint[3].feedback) - *(haldata->dimy)) / *(joint[2].feedback) : 0.11;
   }
 }
 
