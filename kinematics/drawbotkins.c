@@ -6,8 +6,6 @@
 #include "rtapi_math.h"
 #include "hal.h"
 
-#define FB_TOLERANCE 1E-3
-
 struct hal_joint_t {
   hal_bit_t *homed;
   hal_bit_t *home_switch;
@@ -19,12 +17,15 @@ struct hal_joint_t {
 };
 
 struct haldata {
-  hal_float_t *radius;
-  hal_float_t *limit;
+  hal_float_t *radius;	// radius of the drawing surface
+  hal_float_t *limit;	// distance from the carriage pivot to the magnet
+
+  // Dimensions of the drawbot
   hal_float_t *dimx;
   hal_float_t *dimy;
   hal_float_t *dimz;
 
+	// Size of the drawing bed
 	hal_float_t *limx;
 	hal_float_t *limy;
 
