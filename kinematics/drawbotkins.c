@@ -133,8 +133,8 @@ int kinematicsInverse(const EmcPose *pos,
   int idx, sx = -1, sy = 1, nx, ny;
   double dx, dy, dz;
 
-	double limx = 0.5 * sx * fmin(*(haldata->dimx), *(haldata->limx));
-	double limy = 0.5 * sx * fmin(*(haldata->dimy), *(haldata->limy));
+	double limx = 0.5 * sx * fmin(*(haldata->dimx) - 2.0 * *(haldata->limit), *(haldata->limx));
+	double limy = 0.5 * sx * fmin(*(haldata->dimy) - 2.0 * *(haldata->limit), *(haldata->limy));
 	double limz = *(haldata->dimz);
 
 	// Check our limits
@@ -145,6 +145,7 @@ int kinematicsInverse(const EmcPose *pos,
 		return -1;
 	}
 
+	// TODO: This needs to compensate for the carriage tipping the further it gets from the center
   for(idx = 0; idx < 4; ++idx) {
     double tower_x = 0.5 * sx * *(haldata->dimx);
     double tower_y = 0.5 * sy * *(haldata->dimy);
