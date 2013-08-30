@@ -14,6 +14,8 @@ struct hal_joint_t {
   hal_float_t *jog;
   hal_float_t *feedback;
   hal_bit_t *position;
+
+  hal_bit_t started, tripped;
 };
 
 struct haldata {
@@ -25,9 +27,9 @@ struct haldata {
   hal_float_t *dimy;
   hal_float_t *dimz;
 
-	// Size of the drawing bed
-	hal_float_t *limx;
-	hal_float_t *limy;
+  // Size of the drawing bed
+  hal_float_t *limx;
+  hal_float_t *limy;
 
   hal_bit_t *homing;
   hal_bit_t *occupied;
@@ -73,7 +75,7 @@ int rtapi_app_main(void) {
     if((status = hal_pin_float_new("drawbot.extent.dim-y", HAL_IN, &(haldata->dimy), comp_id)) < 0) break;
     if((status = hal_pin_float_new("drawbot.extent.dim-z", HAL_IN, &(haldata->dimz), comp_id)) < 0) break;
 
-	if((status = hal_pin_float_new("drawbot.extent.lim-x", HAL_IN, &(haldata->limx), comp_id)) < 0) break;
+    if((status = hal_pin_float_new("drawbot.extent.lim-x", HAL_IN, &(haldata->limx), comp_id)) < 0) break;
     if((status = hal_pin_float_new("drawbot.extent.lim-y", HAL_IN, &(haldata->limy), comp_id)) < 0) break;
 
     if((status = hal_pin_bit_new("drawbot.is-homing", HAL_OUT, &(haldata->homing), comp_id)) < 0) break;
@@ -103,6 +105,9 @@ int export_joint(int num, struct hal_joint_t *joint) {
   int status = 0;
 
   do {
+    joint->started = 0;
+    joint->tripped = 0;
+
     if((status = hal_pin_bit_newf(HAL_IN, &(joint->homed), comp_id, "drawbot.%d.is-homed", num)) < 0) break;
     if((status = hal_pin_bit_newf(HAL_IN, &(joint->home_switch), comp_id, "drawbot.%d.home-sw", num)) < 0) break;
     if((status = hal_pin_bit_newf(HAL_OUT, &(joint->home), comp_id, "drawbot.%d.home", num)) < 0) break;
@@ -113,6 +118,10 @@ int export_joint(int num, struct hal_joint_t *joint) {
   } while(false);
 
   return status;
+}
+
+double fmin(double x, double y) {
+  return x < y ? x : y;
 }
 
 int kinematicsForward(const double *joints,
@@ -133,29 +142,34 @@ int kinematicsInverse(const EmcPose *pos,
   int idx, sx = -1, sy = 1, nx, ny;
   double dx, dy, dz;
 
-	double limx = 0.5 * sx * fmin(*(haldata->dimx) - 2.0 * *(haldata->limit), *(haldata->limx));
-	double limy = 0.5 * sx * fmin(*(haldata->dimy) - 2.0 * *(haldata->limit), *(haldata->limy));
-	double limz = *(haldata->dimz);
+  double limx = 0.5 * sx * fmin(*(haldata->dimx) - 2.0 * *(haldata->limit), *(haldata->limx));
+  double limy = 0.5 * sx * fmin(*(haldata->dimy) - 2.0 * *(haldata->limit), *(haldata->limy));
+  double limz = *(haldata->dimz);
 
-	// Check our limits
-	if(pos->tran.x < -limx || pos->tran.x > limx
-		|| pos->tran.y < -limy || pos->tran.y > limy
-		|| pos->tran.z > limz || pos->tran.z < 0.0)
-	{
-		return -1;
-	}
+  // Check our limits
+  if(pos->tran.z < 0.0 || pos->tran.z > limz) {
+    return -1;
+  }
+  /*
+    if(pos->tran.x < -limx || pos->tran.x > limx
+    || pos->tran.y < -limy || pos->tran.y > limy
+    || pos->tran.z < -limz || pos->tran.z > 0.0)
+    {
+    return -1;
+    }
+  */
 
 	// TODO: This needs to compensate for the carriage tipping the further it gets from the center
   for(idx = 0; idx < 4; ++idx) {
     double tower_x = 0.5 * sx * *(haldata->dimx);
     double tower_y = 0.5 * sy * *(haldata->dimy);
 
-    double carriage_x = x + rt2 * sx * *(haldata->radius);
-    double carriage_y = y + rt2 * sy * *(haldata->radius);
+    double carriage_x = pos->tran.x + rt2 * sx * *(haldata->radius);
+    double carriage_y = pos->tran.y + rt2 * sy * *(haldata->radius);
 
     dx = carriage_x - tower_x;
     dy = carriage_y - tower_y;
-    dz = z - *(haldata->dimz);
+    dz = limz - pos->tran.z;
 
     joints[idx] = sqrt(dx*dx + dy*dy + dz*dz) - *(haldata->limit);
     if(joints[idx] < 0.0) {
@@ -178,21 +192,18 @@ int kinematicsHome(EmcPose *world,
 		   KINEMATICS_FORWARD_FLAGS *fflags,
 		   KINEMATICS_INVERSE_FLAGS *iflags)
 {
-	int idx;
+  int idx;
   double hypot = sqrt(*(haldata->dimx) * *(haldata->dimx) + *(haldata->dimy) * *(haldata->dimy));
 
   *fflags = 0;
   *iflags = 0;
 
-	for(idx = 0; idx < 9; ++ idx) {
-		joints[idx] = idx < 4 ? 0.5 * hypot - *(haldata->radius) : 0.0;
-	}
+  for(idx = 0; idx < 9; ++ idx) {
+    joints[idx] = idx < 4 ? 0.5 * hypot - *(haldata->radius) : 0.0;
+  }
 
   // Because of the way the ZERO_EMC_POSE macro the extra parens are mandatory
   ZERO_EMC_POSE((*world));
-  world->tran.x = 0.0;
-  world->tran.y = 0.0;
-  world->tran.z = *(haldata->dimz);
 
   return 0;
 }
@@ -249,33 +260,38 @@ void drawbot_home(void *args, long period) {
   if(!(*(haldata->homing) = homing)) {
     for(idx = 0; idx < 4; ++idx) {
       *(haldata->joint[idx].jog) = 0.0;
+      haldata->joint[idx].started = 0;
+      haldata->joint[idx].tripped = 0;
     }
   }
 }
 
 void drawbot_home_x(struct hal_joint_t *joint) {
-  if(*(joint[0].home_switch)) {
-    if(in_position(joint)) {
+  if(joint[0].tripped) {
+    if(*(joint[0].position)) {
       *(joint[0].home) = 1;
-    } else {
-      halt_motion(joint);
     }
-  } else if(!*(joint[0].homed)) {
+  } else if(*(joint[0].home_switch)) {
+    joint[0].tripped = 1;
+    halt_motion(joint);
+  } else if(!joint[0].started) {
+    joint[0].started = 1;
+
     *(joint[0].jog) = -1.0;
-	*(joint[1].jog) = *(joint[1].homed) ? 1.1 * (*(joint[1].feedback) - *(haldata->dimx)) / *(joint[0].feedback) : 0.11;
-	*(joint[2].jog) = *(joint[2].homed) ? 1.0 : 0.62;
-	*(joint[3].jog) = *(joint[3].homed) ? 1.1 * (*(joint[3].feedback) - *(haldata->dimy)) / *(joint[0].feedback) : 0.11;
+    *(joint[2].jog) = *(joint[2].homed) ? 1.0 : 0.62;
   }
 }
 
 void drawbot_home_y(struct hal_joint_t *joint) {
-  if(*(joint[1].home_switch)) {
-    if(in_position(joint)) {
+  if(joint[1].tripped) {
+    if(*(joint[1].position)) {
       *(joint[1].home) = 1;
-    } else {
-      halt_motion(joint);
     }
-  } else if(!*(joint[1].homed)) {
+  } else if(*(joint[1].home_switch)) {
+    joint[1].tripped = 1;
+    halt_motion(joint);
+  } else if(!joint[1].started) {
+    joint[1].started = 1;
     *(joint[1].jog) = -1.0;
     *(joint[2].jog) = 1.0;
     *(joint[3].jog) = 0.41;
@@ -283,28 +299,30 @@ void drawbot_home_y(struct hal_joint_t *joint) {
 }
 
 void drawbot_home_z(struct hal_joint_t *joint) {
-  if(*(joint[2].home_switch)) {
-    if(in_position(joint)) {
+  if(joint[2].tripped) {
+    if(*(joint[2].position)) {
       *(joint[2].home) = 1;
-    } else {
-      halt_motion(joint);
     }
-  } else if(!*(joint[2].homed)) {
+  } else if(*(joint[2].home_switch)) {
+    joint[2].tripped = 1;
+    halt_motion(joint);
+  } else if(!joint[2].started) {
+    joint[2].started = 1;
     *(joint[0].jog) = *(joint[0].homed) ? 1.0 : 0.62;
-	*(joint[1].jog) = *(joint[1].homed) ? 1.1 * (*(joint[1].feedback) - *(haldata->dimx)) / *(joint[2].feedback) : 0.11;
     *(joint[2].jog) = -1.0;
-	*(joint[3].jog) = *(joint[3].homed) ? 1.1 * (*(joint[3].feedback) - *(haldata->dimy)) / *(joint[2].feedback) : 0.11;
   }
 }
 
 void drawbot_home_a(struct hal_joint_t *joint) {
-  if(*(joint[3].home_switch)) {
+  if(joint[3].tripped) {
     if(in_position(joint)) {
       *(joint[3].home) = 1;
-    } else {
-      halt_motion(joint);
     }
-  } else if(!*(joint[3].homed)) {
+  } else if(*(joint[3].home_switch)) {
+    joint[3].tripped = 1;
+    halt_motion(joint);
+  } else if(!joint[3].started) {
+    joint[3].started;
     *(joint[1].jog) = 1.0;
     *(joint[3].jog) = -1.0;
   }
