@@ -77,10 +77,16 @@ net charge-pump => parport.0.pin-16-out
 net dout-00 => parport.0.pin-17-out
 
 # Configure parallel port input
-net raw-min-x <= parport.0.pin-10-in => debounce.0.0.in
-net raw-min-y <= parport.0.pin-11-in => debounce.0.1.in
-net raw-min-z <= parport.0.pin-12-in => debounce.0.2.in
-net raw-min-a <= parport.0.pin-13-in => debounce.0.3.in
+#net raw-min-x <= parport.0.pin-10-in
+#net raw-min-y <= parport.0.pin-11-in
+#net raw-min-z <= parport.0.pin-12-in
+#net raw-min-a <= parport.0.pin-13-in
+
+net min-x <= parport.0.pin-10-in
+net min-y <= parport.0.pin-11-in
+net min-z <= parport.0.pin-12-in
+net min-a <= parport.0.pin-13-in
+
 net estop-ext <= parport.0.pin-15-in-not
 
 # Configure step generation
@@ -140,10 +146,27 @@ net zenable axis.2.amp-enable-out => stepgen.2.enable
 net aenable axis.3.amp-enable-out => stepgen.3.enable
 
 # Configure home switches
-net min-x <= debounce.0.0.out => axis.0.home-sw-in
-net min-y <= debounce.0.1.out => axis.1.home-sw-in
-net min-z <= debounce.0.2.out => axis.2.home-sw-in
-net min-a <= debounce.0.3.out => axis.3.home-sw-in
+setp debounce.0.delay 2
+
+#net raw-min-x => debounce.0.0.in
+#net raw-min-y => debounce.0.1.in
+#net raw-min-z => debounce.0.2.in
+#net raw-min-a => debounce.0.3.in
+
+#net min-x <= debounce.0.0.out
+#net min-y <= debounce.0.1.out
+#net min-z <= debounce.0.2.out
+#net min-a <= debounce.0.3.out
+
+net min-x => axis.0.home-sw-in
+net min-y => axis.1.home-sw-in
+net min-z => axis.2.home-sw-in
+net min-a => axis.3.home-sw-in
+
+#net min-x => axis.0.neg-lim-sw-in
+#net min-y => axis.1.neg-lim-sw-in
+#net min-z => axis.2.neg-lim-sw-in
+#net min-a => axis.3.neg-lim-sw-in
 
 # Configure the e-stop
 net estop-out <= iocontrol.0.user-enable-out
