@@ -33,6 +33,7 @@ struct haldata {
 
   hal_bit_t *homing;
   hal_bit_t *occupied;
+	hal_bit_t *headless;
 
   struct hal_joint_t joint[4];
 } *haldata = 0;
@@ -80,6 +81,7 @@ int rtapi_app_main(void) {
 
     if((status = hal_pin_bit_new("drawbot.is-homing", HAL_OUT, &(haldata->homing), comp_id)) < 0) break;
     if((status = hal_pin_bit_new("drawbot.is-occupied", HAL_IN, &(haldata->occupied), comp_id)) < 0) break;
+	if((status = hal_pin_bit_new("drawbot.is-headless", HAL_IN, &(haldata->headless), comp_id)) < 0) break;
 
     if((status = export_joint(0, &(haldata->joint[0]))) < 0) break;
     if((status = export_joint(1, &(haldata->joint[1]))) < 0) break;
@@ -242,18 +244,26 @@ void drawbot_home(void *args, long period) {
   }
 
   if(homing) {
-    // Home order X -> Z -> Y -> A
-    if(!*(haldata->joint[0].homed)) {
-      drawbot_home_x(haldata->joint);
-    } else if(!*(haldata->joint[2].homed)) {
-      drawbot_home_z(haldata->joint);
-    } else if(!*(haldata->joint[1].homed)) {
-      drawbot_home_y(haldata->joint);
-    } else if(!*(haldata->joint[3].homed)) {
-      drawbot_home_a(haldata->joint);
-    } else {
-      homing = 0;
-    }
+	// Home order X -> Z -> Y -> A
+	if(*(haldata->headless)) {
+		if(in_motion(haldata->joint)) {
+			halt_motion(haldata->joint);
+		} else {
+			for(idx = 0; idx < 4; ++idx) {
+				*(joints[idx].home) = 1;
+			}
+		}
+	} else if(!*(haldata->joint[0].homed)) {
+		drawbot_home_x(haldata->joint);
+	} else if(!*(haldata->joint[2].homed)) {
+		drawbot_home_z(haldata->joint);
+	} else if(!*(haldata->joint[1].homed)) {
+		drawbot_home_y(haldata->joint);
+	} else if(!*(haldata->joint[3].homed)) {
+		drawbot_home_a(haldata->joint);
+	} else {
+		homing = 0;
+	}
   }
 
   // If we are no longer homing stop jogging
