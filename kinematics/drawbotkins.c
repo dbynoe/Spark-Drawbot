@@ -233,26 +233,34 @@ void halt_motion(struct hal_joint_t *joints) {
 
 void drawbot_home(void *args, long period) {
   int idx;
-  hal_bit_t homing = 1;
+  hal_bit_t homing = 0;
+
+  for(idx = 0; idx < 4; ++idx) {
+	if(*(haldata->joint[0].homed)) {
+		*(haldata->joint[idx].home) = 0;
+	} else {
+		homing = 1;
+	}
+  }
 
   if(*(haldata->occupied)) {
     homing = 0;
   }
 
-  for(idx = 0; idx < 4; ++idx) {
-    *(haldata->joint[idx].home) = 0;
-  }
-
   if(homing) {
 	// Home order X -> Z -> Y -> A
 	if(*(haldata->headless)) {
-		if(in_motion(haldata->joint)) {
-			halt_motion(haldata->joint);
-		} else {
-			for(idx = 0; idx < 4; ++idx) {
-				*(joints[idx].home) = 1;
+		for(idx = 0; idx < 4; ++idx) {
+			if(*(haldata->joint[0].homed)) {
+				continue;
+			}
+			if(*(haldata->joint[idx].position)) {
+				*(haldata->joint[idx].home) = 1;
+			} else {
+				*(haldata->joint[idx].jog) = 0.0;
 			}
 		}
+		homing = 0;
 	} else if(!*(haldata->joint[0].homed)) {
 		drawbot_home_x(haldata->joint);
 	} else if(!*(haldata->joint[2].homed)) {

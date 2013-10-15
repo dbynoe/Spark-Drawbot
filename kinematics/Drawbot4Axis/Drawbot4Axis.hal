@@ -199,6 +199,9 @@ net occupied-delay <= or2.0.out => timedelay.0.in
 
 net is-occupied <= timedelay.0.out => drawbot.is-occupied
 
+# Run the drawbot in headless mode for testing purposes
+setp drawbot.is-headless 1
+
 # Drawbot extents
 setp drawbot.extent.radius [DRAWBOT]CARRIAGE_RADIUS
 setp drawbot.extent.limit [DRAWBOT]HOME_OFFSET
