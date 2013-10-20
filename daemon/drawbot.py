@@ -11,6 +11,7 @@ import traceback
 
 import ConfigParser
 from emc import EMC
+from random import choice
 from daemon import runner
 
 def shutdown(app):
@@ -19,6 +20,7 @@ def shutdown(app):
 class App(object):
 	def __init__(self, config):
 		self._config = config
+		self._drawing = False
 
 		self.stdin_path = '/dev/null'
 		self.stdout_path = '/dev/null'
@@ -65,7 +67,7 @@ class App(object):
 	def on_idle(self):
 		if self.emc.estop == "ESTOP ON":
 			self.emc.estop = False
-		
+
 		if self.emc.machine == "MACHINE OFF":
 			self.emc.machine = True
 
@@ -77,12 +79,30 @@ class App(object):
 			logger.info("Waiting for joints to home")
 			return
 
-		self.emc.open(self.next_program())
+		next = self.next_program()
+		self.emc.open(next)
+
 		self.emc.mode = "auto"
 		self.emc.run()
 
 	def next_program(self):
-		return ""
+		source = self._config.get["PATHS", "draw" if self._drawing else "erase"]
+		return random_file(source)
+
+	def random_file(path):
+		allFiles = []
+		for root, dirs, files in os.walk('/etc/'):
+			if not root.endswith('/'):
+				root += '/'
+
+			#skip all directors that start with '.'
+			map(dirs.remove, [d for d in dirs if d.startswith('.')])
+			#skip all files that start with '.'
+			map(files.remove, [f for f in files if f.startswith('.')])
+
+			allFiles += [root + f for f in files]
+
+		return choice(allFiles)
 
 	def shutdown(self):
 		logger.info("Stopping")
