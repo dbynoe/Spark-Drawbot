@@ -8,15 +8,7 @@ TARGET=drawbotd
 
 .PHONY: install
 
-all: $(TARGET)
-
-$(TARGET): $(OBJECTS)
-	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
-
-.c.o:
-	$(CC) $(CCFLAGS) $< -o $@
-
 install:
 
 clean:
-	rm -f $(TARGET) *.o
+	rm -f *.pyc
