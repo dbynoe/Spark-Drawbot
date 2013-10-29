@@ -6,12 +6,11 @@ loadrt drawbotkins
 
 loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[TRAJ]AXES
 loadrt probe_parport
-loadrt hal_parport cfg="0x378 out  "
+loadrt hal_parport cfg="0x378 out"
 
 loadrt debounce cfg=4
 loadrt or2 count=1
 loadrt not count=2
-loadrt timedelay count=1
 
 setp parport.0.reset-time 1000
 
@@ -32,7 +31,6 @@ addf parport.0.reset base-thread
 addf or2.0 base-thread
 addf not.0 base-thread
 addf not.1 base-thread
-addf debounce.0 base-thread
 
 # Add all servo thread functions
 addf stepgen.capture-position servo-thread
@@ -40,7 +38,6 @@ addf motion-command-handler servo-thread
 addf motion-controller servo-thread
 addf stepgen.update-freq servo-thread
 addf pwmgen.update servo-thread
-addf timedelay.0 servo-thread
 addf drawbot.home servo-thread
 
 net spindle-cmd <= motion.spindle-speed-out => pwmgen.0.value
@@ -77,11 +74,6 @@ net charge-pump => parport.0.pin-16-out
 net dout-00 => parport.0.pin-17-out
 
 # Configure parallel port input
-#net raw-min-x <= parport.0.pin-10-in
-#net raw-min-y <= parport.0.pin-11-in
-#net raw-min-z <= parport.0.pin-12-in
-#net raw-min-a <= parport.0.pin-13-in
-
 net min-x <= parport.0.pin-10-in
 net min-y <= parport.0.pin-11-in
 net min-z <= parport.0.pin-12-in
@@ -146,27 +138,10 @@ net zenable axis.2.amp-enable-out => stepgen.2.enable
 net aenable axis.3.amp-enable-out => stepgen.3.enable
 
 # Configure home switches
-setp debounce.0.delay 2
-
-#net raw-min-x => debounce.0.0.in
-#net raw-min-y => debounce.0.1.in
-#net raw-min-z => debounce.0.2.in
-#net raw-min-a => debounce.0.3.in
-
-#net min-x <= debounce.0.0.out
-#net min-y <= debounce.0.1.out
-#net min-z <= debounce.0.2.out
-#net min-a <= debounce.0.3.out
-
 net min-x => axis.0.home-sw-in
 net min-y => axis.1.home-sw-in
 net min-z => axis.2.home-sw-in
 net min-a => axis.3.home-sw-in
-
-#net min-x => axis.0.neg-lim-sw-in
-#net min-y => axis.1.neg-lim-sw-in
-#net min-z => axis.2.neg-lim-sw-in
-#net min-a => axis.3.neg-lim-sw-in
 
 # Configure the e-stop
 net estop-out <= iocontrol.0.user-enable-out
@@ -183,24 +158,8 @@ setp axis.1.jog-scale 1.0
 setp axis.2.jog-scale 1.0
 setp axis.3.jog-scale 1.0
 
-#Attach halui
-setp halui.jog-speed 2000.0
-setp halui.jog-deadband 0.01
-
-net unpowered not.0.in <= halui.machine.is-on
-
-net occupied-running or2.0.in0 <= halui.program.is-running
-net occupied-unpowered or2.0.in1 <= not.0.out
-
-setp timedelay.0.on-delay 0.0
-setp timedelay.0.off-delay 1.0
-
-net occupied-delay <= or2.0.out => timedelay.0.in
-
-net is-occupied <= timedelay.0.out => drawbot.is-occupied
-
 # Run the drawbot in headless mode for testing purposes
-setp drawbot.is-headless 1
+setp drawbot.is-headless [DRAWBOT]HEADLESS
 
 # Drawbot extents
 setp drawbot.extent.radius [DRAWBOT]CARRIAGE_RADIUS
@@ -213,46 +172,7 @@ setp drawbot.extent.dim-z [DRAWBOT]DIMENSION_Z
 setp drawbot.extent.lim-x [DRAWBOT]LIMIT_X
 setp drawbot.extent.lim-y [DRAWBOT]LIMIT_Y
 
-# Coordinate mode
-net jog-joint <= drawbot.is-homing
-net jog-joint => halui.mode.joint
-net jog-joint => not.1.in
+setp drawbot.is-occupied 1
+setp drawbot.is-homing 0
 
-net jog-coord <= not.1.out
-net jog-coord => halui.mode.teleop
-
-# Joint homed state
-net homed-x <= halui.joint.0.is-homed => drawbot.0.is-homed
-net homed-y <= halui.joint.1.is-homed => drawbot.1.is-homed
-net homed-z <= halui.joint.2.is-homed => drawbot.2.is-homed
-net homed-a <= halui.joint.3.is-homed => drawbot.3.is-homed
-
-# Joint home switches
-net min-x => drawbot.0.home-sw
-net min-y => drawbot.1.home-sw
-net min-z => drawbot.2.home-sw
-net min-a => drawbot.3.home-sw
-
-# Joint home commands
-net home-x <= drawbot.0.home => halui.joint.0.home
-net home-y <= drawbot.1.home => halui.joint.1.home
-net home-z <= drawbot.2.home => halui.joint.2.home
-net home-a <= drawbot.3.home => halui.joint.3.home
-
-# Joint output
-net jog-x <= drawbot.0.jog => halui.jog.0.analog
-net jog-y <= drawbot.1.jog => halui.jog.1.analog
-net jog-z <= drawbot.2.jog => halui.jog.2.analog
-net jog-a <= drawbot.3.jog => halui.jog.3.analog
-
-# Joint motion
-net motion-x <= axis.0.in-position => drawbot.0.in-position
-net motion-y <= axis.1.in-position => drawbot.1.in-position
-net motion-z <= axis.2.in-position => drawbot.2.in-position
-net motion-a <= axis.3.in-position => drawbot.3.in-position
-
-# Joint feedback
-net fb-x <= axis.0.joint-pos-fb => drawbot.0.fb
-net fb-y <= axis.1.joint-pos-fb => drawbot.1.fb
-net fb-z <= axis.2.joint-pos-fb => drawbot.2.fb
-net fb-a <= axis.3.joint-pos-fb => drawbot.3.fb
+loadusr linuxcncrsh --path [DRAWBOT]PATH --

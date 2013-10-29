@@ -1,12 +1,8 @@
-CC=gcc
-CCFLAGS=-c -std=c99 -lm
-LDFLAGS=
+USR=/usr/share/drawbot
 
-SOURCES=$(wildcard *.c)
-OBJECTS=$(SOURCES:.c=.o)
-TARGET=drawbotd
+.PHONY: all install
 
-.PHONY: install
+all:
 
 install:
 

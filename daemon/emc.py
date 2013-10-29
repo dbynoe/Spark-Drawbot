@@ -40,18 +40,27 @@ class EMC(object):
 
 	def connect(self):
 		self._telnet = telnetlib.Telnet(self._host, self._port)
+		self._telnet.set_option_negotiation_callback(self.negotiation_callback)
+
+	def negotiation_callback(self, socket, command, option):
+		self._logger.info(command)
+		self._logger.info(option)
 
 	def execute(self, command):
 		self._logger.debug(command.strip())
 		self._telnet.write(command)
 
-		result = self._telnet.read_until("\r\n").strip()
+		try:
+			result = self._telnet.read_until("\r\n").strip()
+		except EOFError as ex:
+			self._logger.error(ex)
+			return None
 
 		return result
 
 	def hello(self):
 		result = self.execute(self.HELLO.format(password = self._auth_password, client = self._auth_client))
-		if result != "HELLO ACK EMCNETSVR 1.1":
+		if not result.startswith("HELLO ACK"):
 			sys.exit(-1)
 		self.set("enable", "EMCTOO")
 
@@ -67,16 +76,22 @@ class EMC(object):
 		return self.execute(self.SET.format(sub = sub, params = " ".join(map(str, params))))
 
 	def quit(self):
-		return self.execute(QUIT)
+		return self.execute(self.QUIT)
 
 	def shutdown(self):
-		return self.execute(SHUTDOWN)
+		return self.execute(self.SHUTDOWN)
 
 	def open(self, file):
 		return self.set("open", file)
 
 	def run(self):
 		return self.set("run")
+
+	def abort(self):
+		return self.set("abort")
+
+	def mdi(self, cmd):
+		return self.set("mdi", cmd)
 
 	def joint_homed(self, joint = None):
 		if joint is None:
@@ -117,3 +132,11 @@ class EMC(object):
 	@mode.setter
 	def mode(self, value):
 		self.set("mode", value)
+
+	#teleop
+	@property
+	def teleop(self):
+		return self.get("teleop_enable")
+	@mode.setter
+	def teleop(self, value):
+		self.set("teleop_enable", "on" if value else "off")

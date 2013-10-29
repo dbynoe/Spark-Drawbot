@@ -12,7 +12,6 @@ struct hal_joint_t {
   hal_bit_t *home;
 
   hal_float_t *jog;
-  hal_float_t *feedback;
   hal_bit_t *position;
 
   hal_bit_t started, tripped;
@@ -33,7 +32,7 @@ struct haldata {
 
   hal_bit_t *homing;
   hal_bit_t *occupied;
-	hal_bit_t *headless;
+  hal_bit_t *headless;
 
   struct hal_joint_t joint[4];
 } *haldata = 0;
@@ -79,9 +78,9 @@ int rtapi_app_main(void) {
     if((status = hal_pin_float_new("drawbot.extent.lim-x", HAL_IN, &(haldata->limx), comp_id)) < 0) break;
     if((status = hal_pin_float_new("drawbot.extent.lim-y", HAL_IN, &(haldata->limy), comp_id)) < 0) break;
 
-    if((status = hal_pin_bit_new("drawbot.is-homing", HAL_OUT, &(haldata->homing), comp_id)) < 0) break;
+    if((status = hal_pin_bit_new("drawbot.is-homing", HAL_IN, &(haldata->homing), comp_id)) < 0) break;
     if((status = hal_pin_bit_new("drawbot.is-occupied", HAL_IN, &(haldata->occupied), comp_id)) < 0) break;
-	if((status = hal_pin_bit_new("drawbot.is-headless", HAL_IN, &(haldata->headless), comp_id)) < 0) break;
+    if((status = hal_pin_bit_new("drawbot.is-headless", HAL_IN, &(haldata->headless), comp_id)) < 0) break;
 
     if((status = export_joint(0, &(haldata->joint[0]))) < 0) break;
     if((status = export_joint(1, &(haldata->joint[1]))) < 0) break;
@@ -115,7 +114,6 @@ int export_joint(int num, struct hal_joint_t *joint) {
     if((status = hal_pin_bit_newf(HAL_OUT, &(joint->home), comp_id, "drawbot.%d.home", num)) < 0) break;
 
     if((status = hal_pin_float_newf(HAL_OUT, &(joint->jog), comp_id, "drawbot.%d.jog", num)) < 0) break;
-    if((status = hal_pin_float_newf(HAL_IN, &(joint->feedback), comp_id, "drawbot.%d.fb", num)) < 0) break;
     if((status = hal_pin_bit_newf(HAL_IN, &(joint->position), comp_id, "drawbot.%d.in-position", num)) < 0) break;
   } while(false);
 
@@ -152,14 +150,6 @@ int kinematicsInverse(const EmcPose *pos,
   if(pos->tran.z < 0.0 || pos->tran.z > limz) {
     return -1;
   }
-  /*
-    if(pos->tran.x < -limx || pos->tran.x > limx
-    || pos->tran.y < -limy || pos->tran.y > limy
-    || pos->tran.z < -limz || pos->tran.z > 0.0)
-    {
-    return -1;
-    }
-  */
 
 	// TODO: This needs to compensate for the carriage tipping the further it gets from the center
   for(idx = 0; idx < 4; ++idx) {
@@ -236,46 +226,37 @@ void drawbot_home(void *args, long period) {
   hal_bit_t homing = 0;
 
   for(idx = 0; idx < 4; ++idx) {
-	if(*(haldata->joint[0].homed)) {
-		*(haldata->joint[idx].home) = 0;
-	} else {
-		homing = 1;
-	}
+    *(haldata->joint[idx].home) = 0;
   }
-
   if(*(haldata->occupied)) {
-    homing = 0;
+    return;
   }
 
-  if(homing) {
-	// Home order X -> Z -> Y -> A
-	if(*(haldata->headless)) {
-		for(idx = 0; idx < 4; ++idx) {
-			if(*(haldata->joint[0].homed)) {
-				continue;
-			}
-			if(*(haldata->joint[idx].position)) {
-				*(haldata->joint[idx].home) = 1;
-			} else {
-				*(haldata->joint[idx].jog) = 0.0;
-			}
-		}
-		homing = 0;
-	} else if(!*(haldata->joint[0].homed)) {
-		drawbot_home_x(haldata->joint);
-	} else if(!*(haldata->joint[2].homed)) {
-		drawbot_home_z(haldata->joint);
-	} else if(!*(haldata->joint[1].homed)) {
-		drawbot_home_y(haldata->joint);
-	} else if(!*(haldata->joint[3].homed)) {
-		drawbot_home_a(haldata->joint);
-	} else {
-		homing = 0;
+  if(*(haldata->homing)) {
+    // Home order X -> Z -> Y -> A
+    if(*(haldata->headless)) {
+      for(idx = 0; idx < 4; ++idx) {
+	if(*(haldata->joint[idx].homed)) {
+	  continue;
 	}
-  }
-
-  // If we are no longer homing stop jogging
-  if(!(*(haldata->homing) = homing)) {
+	if(*(haldata->joint[idx].position)) {
+	  *(haldata->joint[idx].home) = 1;
+	} else {
+	  *(haldata->joint[idx].jog) = 0.0;
+	}
+      }
+    } else {
+      if(!*(haldata->joint[0].homed)) {
+	drawbot_home_x(haldata->joint);
+      } else if(!*(haldata->joint[2].homed)) {
+	drawbot_home_z(haldata->joint);
+      } else if(!*(haldata->joint[1].homed)) {
+	drawbot_home_y(haldata->joint);
+      } else if(!*(haldata->joint[3].homed)) {
+	drawbot_home_a(haldata->joint);
+      }
+    }
+  } else {
     for(idx = 0; idx < 4; ++idx) {
       *(haldata->joint[idx].jog) = 0.0;
       haldata->joint[idx].started = 0;
