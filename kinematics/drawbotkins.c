@@ -120,8 +120,16 @@ int export_joint(int num, struct hal_joint_t *joint) {
   return status;
 }
 
-double fmin(double x, double y) {
+double fmin(const double x, const double y) {
   return x < y ? x : y;
+}
+
+double fmax(const double x, const double y) {
+  return x > y ? x : y;
+}
+
+double fclamp(double v, double lo, double hi) {
+	return fmax(fmin(v, hi), lo);
 }
 
 int kinematicsForward(const double *joints,
@@ -140,28 +148,35 @@ int kinematicsInverse(const EmcPose *pos,
   const double rt2 = sqrt(2.0);
 
   int idx, sx = -1, sy = 1, nx, ny;
-  double dx, dy, dz;
+  double dx, dy, dz, px, py, pz;
 
-  double limx = 0.5 * sx * fmin(*(haldata->dimx) - 2.0 * *(haldata->limit), *(haldata->limx));
-  double limy = 0.5 * sx * fmin(*(haldata->dimy) - 2.0 * *(haldata->limit), *(haldata->limy));
+  double limx = fmin(*(haldata->dimx) - 2.0 * *(haldata->limit), *(haldata->limx));
+  double limy = fmin(*(haldata->dimy) - 2.0 * *(haldata->limit), *(haldata->limy));
   double limz = *(haldata->dimz);
 
-  // Check our limits
-  if(pos->tran.z < 0.0 || pos->tran.z > limz) {
-    return -1;
-  }
+	rtapi_print("(%d %d %d)\n", (int)(1000*pos->tran.x), (int)(1000*pos->tran.y), (int)(1000*pos->tran.z));
+
+	px = fclamp(pos->tran.x, -limx, 0.0) + 0.5 * limx;
+	py = fclamp(pos->tran.y, -limy, 0.0) + 0.5 * limy;
+
+	//px = pos->tran.x;
+	//py = pos->tran.y;
+
+	pz = fclamp(pos->tran.z, 0.0, limz);
+
+	rtapi_print("(%d %d %d)\n", (int)(1000*px), (int)(1000*py), (int)(1000*pz));
 
 	// TODO: This needs to compensate for the carriage tipping the further it gets from the center
   for(idx = 0; idx < 4; ++idx) {
     double tower_x = 0.5 * sx * *(haldata->dimx);
     double tower_y = 0.5 * sy * *(haldata->dimy);
 
-    double carriage_x = pos->tran.x + rt2 * sx * *(haldata->radius);
-    double carriage_y = pos->tran.y + rt2 * sy * *(haldata->radius);
+    double carriage_x = px + rt2 * sx * *(haldata->radius);
+    double carriage_y = py + rt2 * sy * *(haldata->radius);
 
     dx = carriage_x - tower_x;
     dy = carriage_y - tower_y;
-    dz = limz - pos->tran.z;
+    dz = limz - pz;
 
     joints[idx] = sqrt(dx*dx + dy*dy + dz*dz) - *(haldata->limit);
     if(joints[idx] < 0.0) {

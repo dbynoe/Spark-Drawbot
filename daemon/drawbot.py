@@ -29,7 +29,7 @@ class App(object):
 
 		self._hx = 0.5 * self._cnccfg.getfloat("DRAWBOT", "LIMIT_X")
 		self._hy = 0.5 * self._cnccfg.getfloat("DRAWBOT", "LIMIT_Y")
-		self._hz = self._cnccfg.getfloat("DRAWBOT", "DIMENSION_Z")
+		self._hz = 0.5 * self._cnccfg.getfloat("DRAWBOT", "DIMENSION_Z")
 
 		self.log = logging.getLogger('daemon')
 
@@ -122,6 +122,8 @@ class App(object):
 				self.cnc.halcmd('setp drawbot.is-homing 1')
 			self._is_homing = True
 			return
+		if self._is_homing:
+			time.sleep(10)
 		self._is_homing = False
 
 		# Slip into MDI mode and go to 0,0,0 or something
@@ -178,6 +180,7 @@ class App(object):
 			self.emc.abort()
 			self.emc.mode = "mdi"
 			self.emc.mdi("G0 X{x} Y{y} Z{z}".format(x=self._hx, y=self._hy, z=self._hz))
+			time.sleep(5)
 		except Exception as ex:
 			logger.error(ex)
 
