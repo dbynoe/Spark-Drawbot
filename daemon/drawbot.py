@@ -100,9 +100,11 @@ class App(object):
 
 	def on_idle(self):
 		if self.emc.estop == "ESTOP ON":
+			self.log.info("Reseting estop")
 			self.emc.estop = False
 
 		if self.emc.machine == "MACHINE OFF":
+			self.log.info("Powering on machine")
 			self.emc.machine = True
 
 		homed = self.emc.joint_homed()[0:4]
@@ -135,7 +137,7 @@ class App(object):
 		next = self.next_program()
 		if next:
 			self.log.info("Open " + next)
-			self.emc.teleop = True
+			#self.emc.teleop = True
 			self.emc.mode = "auto"
 			self.emc.open(next)
 			self.emc.run()
