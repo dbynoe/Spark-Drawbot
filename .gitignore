@@ -16,6 +16,9 @@
 *.so.*
 *.dylib
 
+# g-code files
+*.ngc
+
 # Executables
 *.exe
 *.out
