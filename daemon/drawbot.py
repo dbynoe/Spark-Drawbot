@@ -44,14 +44,16 @@ class App(object):
 		logger.info("Starting")
 		atexit.register(shutdown, self)
 
+		time.sleep(20.0)
+
 		self.setup();
 		try:
 			while True:
 				while not os.path.exists(self._config.get("LINUXCNC", "lock_file")):
 					self.log.info("Starting linuxcnc")
 					self.cnc.start()
+					time.sleep(5.0)
 
-				time.sleep(5.0)
 				self.cnc.halfile(self._config.get("LINUXCNC", "hal_file"))
 
 				while True:

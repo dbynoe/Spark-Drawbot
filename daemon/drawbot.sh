@@ -22,6 +22,7 @@ case "$1" in
     echo "Stopping server"
     # Stop the daemon
     python $DAEMON stop $CONFIG
+    sleep 10s
     ;;
   restart)
     echo "Restarting server"
