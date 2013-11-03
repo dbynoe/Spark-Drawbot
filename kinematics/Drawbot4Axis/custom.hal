@@ -2,7 +2,7 @@
 # The commands in this file are run after the AXIS GUI (including PyVCP panel) starts
 
 #Attach halui
-setp halui.jog-speed 2000.0
+setp halui.jog-speed 3000.0
 setp halui.jog-deadband 0.01
 
 net unpowered not.0.in <= halui.machine.is-on
