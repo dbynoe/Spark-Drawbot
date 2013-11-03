@@ -27,9 +27,9 @@ class App(object):
 		self._cnccfg = ConfigParser.ConfigParser()
 		self._cnccfg.read(self._config.get("LINUXCNC", "ini"))
 
-		self._hx = 0.5 * self._cnccfg.getfloat("DRAWBOT", "LIMIT_X")
-		self._hy = 0.5 * self._cnccfg.getfloat("DRAWBOT", "LIMIT_Y")
-		self._hz = 0.5 * self._cnccfg.getfloat("DRAWBOT", "DIMENSION_Z")
+		self._hx = 0.0 #0.5 * self._cnccfg.getfloat("DRAWBOT", "LIMIT_X")
+		self._hy = 0.0 #0.5 * self._cnccfg.getfloat("DRAWBOT", "LIMIT_Y")
+		self._hz = 0.25 * self._cnccfg.getfloat("DRAWBOT", "DIMENSION_Z")
 
 		self.log = logging.getLogger('daemon')
 
@@ -128,8 +128,8 @@ class App(object):
 			time.sleep(10)
 		self._is_homing = False
 
-		# Slip into MDI mode and go to 0,0,0 or something
-		# Hold here for some period
+		self.gotozero()
+		time.sleep(10)
 
 		# Load and run the next program
 		next = self.next_program()
@@ -176,12 +176,16 @@ class App(object):
 
 		return None
 
+	def gotozero(self):
+		self.emc.mode = "mdi"
+		self.emc.mdi("G0 X{x} Y{y} Z{z}".format(x=self._hx, y=self._hy, z=self._hz))
+
 	def shutdown(self):
 		self.log.info("Stopping")
 		try:
 			self.emc.abort()
-			self.emc.mode = "mdi"
-			self.emc.mdi("G0 X{x} Y{y} Z{z}".format(x=self._hx, y=self._hy, z=self._hz))
+			self.gotozero()
+
 			time.sleep(5)
 		except Exception as ex:
 			logger.error(ex)

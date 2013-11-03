@@ -154,17 +154,12 @@ int kinematicsInverse(const EmcPose *pos,
   double limy = fmin(*(haldata->dimy) - 2.0 * *(haldata->limit), *(haldata->limy));
   double limz = *(haldata->dimz);
 
-	rtapi_print("(%d %d %d)\n", (int)(1000*pos->tran.x), (int)(1000*pos->tran.y), (int)(1000*pos->tran.z));
+  px = fclamp(pos->tran.x, -0.5 * limx, 0.5 * limx);
+  py = fclamp(pos->tran.y, -0.5 * limy, 0.5 * limy);
+  pz = fclamp(pos->tran.z, 0.0, limz);
 
-	px = fclamp(pos->tran.x, -limx, 0.0) + 0.5 * limx;
-	py = fclamp(pos->tran.y, -limy, 0.0) + 0.5 * limy;
-
-	//px = pos->tran.x;
-	//py = pos->tran.y;
-
-	pz = fclamp(pos->tran.z, 0.0, limz);
-
-	rtapi_print("(%d %d %d)\n", (int)(1000*px), (int)(1000*py), (int)(1000*pz));
+  //rtapi_print("(%d %d %d) -> ", (int)(1000*pos->tran.x), (int)(1000*pos->tran.y), (int)(1000*pos->tran.z));
+  //rtapi_print("(%d %d %d)\n", (int)(1000*px), (int)(1000*py), (int)(1000*pz));
 
 	// TODO: This needs to compensate for the carriage tipping the further it gets from the center
   for(idx = 0; idx < 4; ++idx) {
