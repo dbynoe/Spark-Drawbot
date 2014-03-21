@@ -4,6 +4,7 @@ Spark-Drawbot
 This is the code that drives the four cable sandplotter/drawbot at the Telus Spark Science Centre. 
 
 The project was designed and costructed by David Bynoe - http://www.davidbynoe.com
+
 This software authored by Kevin Loney - http://brainsinjars.com/
 
 This is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
