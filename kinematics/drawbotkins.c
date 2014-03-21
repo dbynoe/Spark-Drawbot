@@ -10,8 +10,11 @@
 # You should have received a copy of the GNU General Public License along with
 # this program; if not, write to the Free Software Foundation, Inc., 51
 # Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+# 
+# The project was designed and costructed by David Bynoe - http://www.davidbynoe.com
+# This software authored by Kevin Loney - http://brainsinjars.com/
 #
-# Copyright (C) 2013 David Bynoe and Kevin Loney
+# Copyright (C) 2013 David Bynoe
 
 #include <float.h>
 
