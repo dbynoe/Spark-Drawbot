@@ -11,7 +11,7 @@
 # this program; if not, write to the Free Software Foundation, Inc., 51
 # Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 # 
-# The project was designed and costructed by David Bynoe - http://www.davidbynoe.com
+# The project was designed and constructed by David Bynoe - http://www.davidbynoe.com
 # This software authored by Kevin Loney - http://brainsinjars.com/
 #
 # Copyright (C) 2013 David Bynoe
