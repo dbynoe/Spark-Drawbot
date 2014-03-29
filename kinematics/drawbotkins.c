@@ -1,20 +1,20 @@
-# This file is part of The Telus Spark Drawbot Code.  It free software: you can
-# redistribute it and/or modify it under the terms of the GNU General Public
-# License as published by the Free Software Foundation, version 2.
-#
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
-# details.
-#
-# You should have received a copy of the GNU General Public License along with
-# this program; if not, write to the Free Software Foundation, Inc., 51
-# Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-# 
-# The project was designed and constructed by David Bynoe - http://www.davidbynoe.com
-# This software authored by Kevin Loney - http://brainsinjars.com/
-#
-# Copyright (C) 2013 David Bynoe
+// This file is part of the Four Cable Sand Plotter Code. It free software: you can
+// redistribute it and/or modify it under the terms of the GNU General Public
+// License as published by the Free Software Foundation, version 2.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+// details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program; if not, write to the Free Software Foundation, Inc., 51
+// Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+//
+// The project was designed and constructed by David Bynoe - http://www.davidbynoe.com
+// This software is based on software authored by Kevin Loney - http://brainsinjars.com/
+//
+// Copyright (C) 2014 David Bynoe
 
 #include <float.h>
 
@@ -37,7 +37,7 @@ struct hal_joint_t {
 
 struct haldata {
   hal_float_t *radius;	// radius of the drawing surface
-  hal_float_t *limit;	// distance from the carriage pivot to the magnet
+  hal_float_t *limit;	// distance from the carriage pivot to the string - this is depreciated DB
 
   // Dimensions of the drawbot
   hal_float_t *dimx;
@@ -48,9 +48,7 @@ struct haldata {
   hal_float_t *limx;
   hal_float_t *limy;
 
-  hal_bit_t *homing;
   hal_bit_t *occupied;
-  hal_bit_t *headless;
 
   struct hal_joint_t joint[4];
 } *haldata = 0;
@@ -61,6 +59,7 @@ EXPORT_SYMBOL(kinematicsInverse);
 EXPORT_SYMBOL(kinematicsHome);
 
 int export_joint(int, struct hal_joint_t*);
+
 
 void drawbot_home(void*, long);
 void drawbot_home_x(struct hal_joint_t*);
@@ -96,16 +95,13 @@ int rtapi_app_main(void) {
     if((status = hal_pin_float_new("drawbot.extent.lim-x", HAL_IN, &(haldata->limx), comp_id)) < 0) break;
     if((status = hal_pin_float_new("drawbot.extent.lim-y", HAL_IN, &(haldata->limy), comp_id)) < 0) break;
 
-    if((status = hal_pin_bit_new("drawbot.is-homing", HAL_IN, &(haldata->homing), comp_id)) < 0) break;
     if((status = hal_pin_bit_new("drawbot.is-occupied", HAL_IN, &(haldata->occupied), comp_id)) < 0) break;
-    if((status = hal_pin_bit_new("drawbot.is-headless", HAL_IN, &(haldata->headless), comp_id)) < 0) break;
 
     if((status = export_joint(0, &(haldata->joint[0]))) < 0) break;
     if((status = export_joint(1, &(haldata->joint[1]))) < 0) break;
     if((status = export_joint(2, &(haldata->joint[2]))) < 0) break;
     if((status = export_joint(3, &(haldata->joint[3]))) < 0) break;
 
-    if((status = hal_export_funct("drawbot.home", drawbot_home, NULL, 1, 0, comp_id)) < 0) break;
   } while(0);
 
   if(status) {
@@ -149,36 +145,31 @@ double fmax(const double x, const double y) {
 double fclamp(double v, double lo, double hi) {
 	return fmax(fmin(v, hi), lo);
 }
-
 int kinematicsForward(const double *joints,
 		      EmcPose *pos,
 		      const KINEMATICS_FORWARD_FLAGS *fflags,
 		      KINEMATICS_INVERSE_FLAGS *iflags)
-{
+{ //So apparently if this section is not here it will still compile, but not work. TIL. 
   return -1;
 }
-
 int kinematicsInverse(const EmcPose *pos,
 		      double *joints,
 		      const KINEMATICS_INVERSE_FLAGS *iflags,
 		      KINEMATICS_FORWARD_FLAGS *fflags)
-{
+{//the code below was writen by Kevin, it wasn't big on comments..
   const double rt2 = sqrt(2.0);
 
   int idx, sx = -1, sy = 1, nx, ny;
-  double dx, dy, dz, px, py, pz;
+  double dx, dy, dz, px, py, pz, offset;
 
   double limx = fmin(*(haldata->dimx) - 2.0 * *(haldata->limit), *(haldata->limx));
   double limy = fmin(*(haldata->dimy) - 2.0 * *(haldata->limit), *(haldata->limy));
   double limz = *(haldata->dimz);
 
-  px = fclamp(pos->tran.x, -0.5 * limx, 0.5 * limx);
+
+	  px = fclamp(pos->tran.x, -0.5 * limx, 0.5 * limx);
   py = fclamp(pos->tran.y, -0.5 * limy, 0.5 * limy);
   pz = fclamp(pos->tran.z, 0.0, limz);
-
-  //rtapi_print("(%d %d %d) -> ", (int)(1000*pos->tran.x), (int)(1000*pos->tran.y), (int)(1000*pos->tran.z));
-  //rtapi_print("(%d %d %d)\n", (int)(1000*px), (int)(1000*py), (int)(1000*pz));
-
 	// TODO: This needs to compensate for the carriage tipping the further it gets from the center
   for(idx = 0; idx < 4; ++idx) {
     double tower_x = 0.5 * sx * *(haldata->dimx);
@@ -195,6 +186,7 @@ int kinematicsInverse(const EmcPose *pos,
     if(joints[idx] < 0.0) {
       joints[idx] = 0.0;
     }
+	joints[idx] -= offset;
 
     nx = sy; ny = -sx;
     sx = nx; sy = ny;
@@ -213,26 +205,25 @@ int kinematicsHome(EmcPose *world,
 		   KINEMATICS_INVERSE_FLAGS *iflags)
 {
   int idx;
-  double hypot = sqrt(*(haldata->dimx) * *(haldata->dimx) + *(haldata->dimy) * *(haldata->dimy));
-
+  //The below line calculates the 3d triangle between the tower and the centre of the bed, I have no idea how operator precedence works in C so.. brackets!
+  double hypot = sqrt(((*(haldata->dimx)/2) * (*(haldata->dimx)/2))+((*(haldata->dimy)/2) * (*(haldata->dimy)/2))+( *(haldata->dimz) * *(haldata->dimz)));
   *fflags = 0;
   *iflags = 0;
-
   for(idx = 0; idx < 9; ++ idx) {
-    joints[idx] = idx < 4 ? 0.5 * hypot - *(haldata->radius) : 0.0;
+    joints[idx] = idx < 4 ? hypot - *(haldata->radius) : 0.0;
   }
-
   // Because of the way the ZERO_EMC_POSE macro the extra parens are mandatory
   ZERO_EMC_POSE((*world));
-
   return 0;
+  
 }
 
 KINEMATICS_TYPE kinematicsType(void) {
-  return KINEMATICS_BOTH;
+//if this is set to kinematics both the x y z display doesn't work. 
+  return KINEMATICS_INVERSE_ONLY;
 }
 
-int in_position(struct hal_joint_t *joints) {
+int in_position(struct hal_joint_t *joints) { //I have no idea what this is
   int idx;
   for(idx = 0; idx < 4; ++idx) {
     if(!*(joints[idx].position)) {
@@ -249,108 +240,3 @@ void halt_motion(struct hal_joint_t *joints) {
   }
 }
 
-void drawbot_home(void *args, long period) {
-  int idx;
-  hal_bit_t homing = 0;
-
-  for(idx = 0; idx < 4; ++idx) {
-    *(haldata->joint[idx].home) = 0;
-  }
-  if(*(haldata->occupied)) {
-    return;
-  }
-
-  if(*(haldata->homing)) {
-    // Home order X -> Z -> Y -> A
-    if(*(haldata->headless)) {
-      for(idx = 0; idx < 4; ++idx) {
-	if(*(haldata->joint[idx].homed)) {
-	  continue;
-	}
-	if(*(haldata->joint[idx].position)) {
-	  *(haldata->joint[idx].home) = 1;
-	} else {
-	  *(haldata->joint[idx].jog) = 0.0;
-	}
-      }
-    } else {
-      if(!*(haldata->joint[0].homed)) {
-	drawbot_home_x(haldata->joint);
-      } else if(!*(haldata->joint[2].homed)) {
-	drawbot_home_z(haldata->joint);
-      } else if(!*(haldata->joint[1].homed)) {
-	drawbot_home_y(haldata->joint);
-      } else if(!*(haldata->joint[3].homed)) {
-	drawbot_home_a(haldata->joint);
-      }
-    }
-  } else {
-    for(idx = 0; idx < 4; ++idx) {
-      *(haldata->joint[idx].jog) = 0.0;
-      haldata->joint[idx].started = 0;
-      haldata->joint[idx].tripped = 0;
-    }
-  }
-}
-
-void drawbot_home_x(struct hal_joint_t *joint) {
-  if(joint[0].tripped) {
-    if(*(joint[0].position)) {
-      *(joint[0].home) = 1;
-    }
-  } else if(*(joint[0].home_switch)) {
-    joint[0].tripped = 1;
-    halt_motion(joint);
-  } else if(!joint[0].started) {
-    joint[0].started = 1;
-
-    *(joint[0].jog) = -1.0;
-    *(joint[2].jog) = *(joint[2].homed) ? 1.0 : 0.62;
-  }
-}
-
-void drawbot_home_y(struct hal_joint_t *joint) {
-  if(joint[1].tripped) {
-    if(*(joint[1].position)) {
-      *(joint[1].home) = 1;
-    }
-  } else if(*(joint[1].home_switch)) {
-    joint[1].tripped = 1;
-    halt_motion(joint);
-  } else if(!joint[1].started) {
-    joint[1].started = 1;
-    *(joint[1].jog) = -1.0;
-    *(joint[2].jog) = 1.0;
-    *(joint[3].jog) = 0.41;
-  }
-}
-
-void drawbot_home_z(struct hal_joint_t *joint) {
-  if(joint[2].tripped) {
-    if(*(joint[2].position)) {
-      *(joint[2].home) = 1;
-    }
-  } else if(*(joint[2].home_switch)) {
-    joint[2].tripped = 1;
-    halt_motion(joint);
-  } else if(!joint[2].started) {
-    joint[2].started = 1;
-    *(joint[0].jog) = *(joint[0].homed) ? 1.0 : 0.62;
-    *(joint[2].jog) = -1.0;
-  }
-}
-
-void drawbot_home_a(struct hal_joint_t *joint) {
-  if(joint[3].tripped) {
-    if(in_position(joint)) {
-      *(joint[3].home) = 1;
-    }
-  } else if(*(joint[3].home_switch)) {
-    joint[3].tripped = 1;
-    halt_motion(joint);
-  } else if(!joint[3].started) {
-    joint[3].started;
-    *(joint[1].jog) = 1.0;
-    *(joint[3].jog) = -1.0;
-  }
-}
