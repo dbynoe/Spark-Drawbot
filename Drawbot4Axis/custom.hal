@@ -1,40 +1,27 @@
-# This file is part of The Telus Spark Drawbot Code.  It free software: you can
+# This file is part of the Four Cable Sand Plotter Code. It free software: you can
 # redistribute it and/or modify it under the terms of the GNU General Public
 # License as published by the Free Software Foundation, version 2.
 #
 # This program is distributed in the hope that it will be useful, but WITHOUT
 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
 # details.
 #
 # You should have received a copy of the GNU General Public License along with
 # this program; if not, write to the Free Software Foundation, Inc., 51
 # Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-# 
-# The project was designed and constructed by David Bynoe - http://www.davidbynoe.com
-# This software authored by Kevin Loney - http://brainsinjars.com/
 #
-# Copyright (C) 2013 David Bynoe
+# The project was designed and constructed by David Bynoe - http://www.davidbynoe.com
+# This software is based on software authored by Kevin Loney - http://brainsinjars.com/
+#
+# Copyright (C) 2014 David Bynoe
 
 # Include your customized HAL commands here
 # The commands in this file are run after the AXIS GUI (including PyVCP panel) starts
 
 #Attach halui
-setp halui.jog-speed 3000.0
+setp halui.jog-speed 2000.0
 setp halui.jog-deadband 0.01
-
-net unpowered not.0.in <= halui.machine.is-on
-
-net occupied-running or2.0.in0 <= halui.program.is-running
-net occupied-unpowered or2.0.in1 <= not.0.out
-
-net is-occupied <= or2.0.out => drawbot.is-occupied
-
-# Joint home switches
-net min-x => drawbot.0.home-sw
-net min-y => drawbot.1.home-sw
-net min-z => drawbot.2.home-sw
-net min-a => drawbot.3.home-sw
 
 # Joint motion
 net motion-x <= axis.0.in-position => drawbot.0.in-position
@@ -43,12 +30,10 @@ net motion-z <= axis.2.in-position => drawbot.2.in-position
 net motion-a <= axis.3.in-position => drawbot.3.in-position
 
 # Coordinate 
-#net jog-joint <= drawbot.is-homing
-#net jog-joint => halui.mode.joint
-#net jog-joint => not.1.in
+net jog-joint => halui.mode.joint
 
 #net jog-coord <= not.1.out
-#net jog-coord => halui.mode.teleop
+net jog-coord => halui.mode.teleop
 
 # Joint homed state
 net homed-x <= halui.joint.0.is-homed
@@ -56,16 +41,16 @@ net homed-y <= halui.joint.1.is-homed
 net homed-z <= halui.joint.2.is-homed
 net homed-a <= halui.joint.3.is-homed
 
-net homed-x => drawbot.0.is-homed
-net homed-y => drawbot.1.is-homed
-net homed-z => drawbot.2.is-homed
-net homed-a => drawbot.3.is-homed
-
 # Joint home commands
 net home-x <= drawbot.0.home => halui.joint.0.home
 net home-y <= drawbot.1.home => halui.joint.1.home
 net home-z <= drawbot.2.home => halui.joint.2.home
 net home-a <= drawbot.3.home => halui.joint.3.home
+
+setp halui.estop.reset 1
+setp halui.machine.on 1
+#setp halui.home-all 1
+#setp halui.mode.teleop 1
 
 # Joint output
 net jog-x <= drawbot.0.jog => halui.jog.0.analog
